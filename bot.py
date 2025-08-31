@@ -154,11 +154,11 @@ def callback_query(call):
         bot.edit_message_text(TERMS_TEXT, call.message.chat.id, call.message.message_id, reply_markup=keyboard)
     elif call.data == "back_start":
         keyboard = types.InlineKeyboardMarkup()
-        keyboard.add(types.InlineKeyboardButton("Available Commands", callback_data="show_commands"))
+        keyboard.add(types.InlineKeyboardButton("🤖 Available Commands", callback_data="show_commands"))
         keyboard.add(types.InlineKeyboardButton("☎️ Contact", callback_data="show_contact"))
         keyboard.row(
-            types.InlineKeyboardButton("Instructions", callback_data="show_instructions"),
-            types.InlineKeyboardButton("Terms", callback_data="show_terms")
+            types.InlineKeyboardButton("👨🏻‍🏫 Instructions", callback_data="show_instructions"),
+            types.InlineKeyboardButton("📗 Terms", callback_data="show_terms")
         )
         keyboard.row(
             types.InlineKeyboardButton("Update Channel", url=UPDATE_CHANNEL_URL),
