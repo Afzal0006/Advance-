@@ -8,6 +8,7 @@ bot = TeleBot(BOT_TOKEN)
 client = MongoClient(MONGO_URI)
 db = client['escrow_bot']
 users_collection = db['users']
+deals_collection = db['deals']  # store /dd deal info
 
 AVAILABLE_COMMANDS = """📌 AVAILABLE COMMANDS
 
@@ -28,7 +29,6 @@ AVAILABLE_COMMANDS = """📌 AVAILABLE COMMANDS
 /token - A command to select token for the escrow
 /deposit - A command to generate deposit address
 /verify - A command to verify wallet address.
-/dispute - A command to raise a dispute request
 /balance - A command to check the balance of the escrow address
 /release - A command to release the funds in the escrow
 /refund - A command to refund the funds in the escrow
@@ -50,26 +50,14 @@ CONTACT_TEXT = """☎️ CONTACT ARBITRATOR
 INSTRUCTIONS_TEXT = """📘 GUIDE “HOW TO USE (Escrow Bot)” FOR SAFE AND FASTEST HASSLE-FREE ESCROW 🚀
 
 Step 1 : Use /escrow command in the DM of the Bot.  
-( It will auto-create a safe escrow group and drop the link so that buyer and seller can join via that link. ) 🔗👥  
+Step 2 : Use /dd command to initiate the process of escrow.  
+Step 3 : Use /buyer or /seller to verify address.  
+Step 4 : Choose token/network with /token.  
+Step 5 : Use /deposit to deposit the asset.  
+Step 6 : Once verified, continue the deal.  
+Step 7 : After success, release asset with /release.  
 
-Step 2 : Use /dd command to initiate the process of escrow where you will get the format to express your deal and info.  
-( It will include quantity, rate, TnC’s agreed upon by both parties. ) 📝🤝  
-
-Step 3 : Use /buyer (your address) if you are a buyer 🛒 or /seller (your address) if you are a seller 🏪 to verify address and continue the deal.  
-( Provide your crypto address which will be used in case of release or refund. ) 💳🔐  
-
-Step 4 : Choose the token and network by /token command and then either party has to accept it. ✅💱  
-
-Step 5 : Use /deposit command to deposit the asset within the bot.  
-( Note : Bot will give the deposit address and it has a time limit to deposit ⏳, you have to deposit within that given time. ) ⏰💸  
-
-Step 6 : Once verified by the bot, you can continue the deal.  
-( Bot will send the real-time deposit details in the chat. ) 📊💬  
-
-Step 7 : After a successful deal, you can release the asset to the party by using /release (amount/all).  
-( Thus, the bot will itself release the asset to the party and send the verification in the chat. ) 🎉💼  
-
-🚨 IN CASE OF ANY DISPUTE OR ISSUE, YOU CAN FEEL FREE TO USE /dispute COMMAND, AND SUPPORT WILL JOIN YOU SHORTLY. 🛎️👩‍💻
+🚨 Use /dispute in case of any issue.
 """
 
 TERMS_TEXT = """📜 TERMS
@@ -83,32 +71,18 @@ Transactions fee will be applicable.
 
 TAKE THIS INTO ACCOUNT WHEN DEPOSITING FUNDS
 
-1️⃣ Record/screenshot the desktop while your perform any testing of logins or data, or recording of physical items being opened, this is to provide evidence that the data does not work, if the data is working and you are happy to release the funds, you can delete the recording.
-
-FAILURE TO PRODUCE SUFFICIENT EVIDENCE OF TESTING WILL RESULT IN LOSS OF FUNDS
-
-2️⃣ Before you purchase any information, please take the time to learn what you are buying
-
-IT IS NOT THE RESPONSIBILITY OF THE SELLER TO EXPLAIN HOW TO USE THE INFORMATION, ALTHOUGH IT MAY HELP MAKE TRANSACTIONS RUN SMOOTHER IF VENDORS HELP BUYERS
-
-3️⃣ Buyer should ONLY EVER release funds when they RECEIVE WHAT YOU PAID FOR.
-
-WE ARE NOT RESPONSIBLE FOR YOU RELEASING EARLY AND CAN NOT RETRIEVE FUNDS BACK
-
-4️⃣ Users should use trusted local wallets such as electrum.org or exodus wallet to prevent any issues with KYC wallets like Coinbase or Paxful.
-
-ONLINE WALLETS CAN BE SLOW AND BLOCK ACCOUNTS
-
-5️⃣ Our fee's are taken from the balance in the wallet (1.0% for P2P and 1.0% for OTC), so make sure you take that into account when depositing funds.
-
-WE ARE A SERVICE BARE THAT IN MIND
-
-6️⃣ Make sure Coin and Network are same for Buyer and Seller, else you may lose your funds.
+1️⃣ Record/screenshot testing of logins or data.  
+2️⃣ Learn what you are buying.  
+3️⃣ Buyer should release funds only after receiving what was paid for.  
+4️⃣ Use trusted wallets to avoid issues.  
+5️⃣ Fees are taken from the wallet balance (1.0% P2P, 1.0% OTC).  
+6️⃣ Ensure coin/network match for buyer and seller.
 """
 
 UPDATE_CHANNEL_URL = "https://t.me/YOUR_UPDATE_CHANNEL"
 VOUCH_CHANNEL_URL = "https://t.me/YOUR_VOUCH_CHANNEL"
 
+# Start command
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     user_id = message.from_user.id
@@ -120,20 +94,45 @@ def send_welcome(message):
             "joined_at": message.date
         })
     keyboard = types.InlineKeyboardMarkup()
-    keyboard.add(types.InlineKeyboardButton("🤖 Available Commands", callback_data="show_commands"))
+    keyboard.add(types.InlineKeyboardButton("Available Commands", callback_data="show_commands"))
     keyboard.add(types.InlineKeyboardButton("☎️ Contact", callback_data="show_contact"))
-    # Instructions and Terms in one row
     keyboard.row(
-        types.InlineKeyboardButton("👨🏻‍🏫Instructions", callback_data="show_instructions"),
-        types.InlineKeyboardButton("📗Terms", callback_data="show_terms")
+        types.InlineKeyboardButton("Instructions", callback_data="show_instructions"),
+        types.InlineKeyboardButton("Terms", callback_data="show_terms")
     )
-    # Update and Vouch channels in one row
     keyboard.row(
         types.InlineKeyboardButton("Update Channel", url=UPDATE_CHANNEL_URL),
         types.InlineKeyboardButton("Vouch Channel", url=VOUCH_CHANNEL_URL)
     )
     bot.send_message(message.chat.id, "Your Trustworthy Telegram Escrow Service", reply_markup=keyboard)
 
+# Handle /dd command
+@bot.message_handler(commands=['dd'])
+def start_deal(message):
+    deals_collection.update_one(
+        {"chat_id": message.chat.id},
+        {"$set": {"dd_started": True}},
+        upsert=True
+    )
+    bot.send_message(
+        message.chat.id,
+        "Hello there,\nKindly tell deal details i.e.\n\n"
+        "Quantity -\nRate -\nConditions (if any) -\n\n"
+        "Remember without it disputes wouldn’t be resolved. Once filled proceed with Specifications of the seller or buyer with /seller or /buyer [CRYPTO ADDRESS]"
+    )
+
+# Handle bot added to group
+@bot.my_chat_member_handler()
+def welcome_new_group(update):
+    if update.new_chat_member.status == "member":
+        chat_id = update.chat.id
+        bot.send_message(
+            chat_id,
+            "📍 Hey there traders! Welcome to our escrow service.\n"
+            "✅ Please start with /dd command and fill the DealInfo Form"
+        )
+
+# Handle callbacks for buttons
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
     if call.data == "show_commands":
@@ -154,11 +153,11 @@ def callback_query(call):
         bot.edit_message_text(TERMS_TEXT, call.message.chat.id, call.message.message_id, reply_markup=keyboard)
     elif call.data == "back_start":
         keyboard = types.InlineKeyboardMarkup()
-        keyboard.add(types.InlineKeyboardButton("🤖 Available Commands", callback_data="show_commands"))
+        keyboard.add(types.InlineKeyboardButton("Available Commands", callback_data="show_commands"))
         keyboard.add(types.InlineKeyboardButton("☎️ Contact", callback_data="show_contact"))
         keyboard.row(
-            types.InlineKeyboardButton("👨🏻‍🏫 Instructions", callback_data="show_instructions"),
-            types.InlineKeyboardButton("📗 Terms", callback_data="show_terms")
+            types.InlineKeyboardButton("Instructions", callback_data="show_instructions"),
+            types.InlineKeyboardButton("Terms", callback_data="show_terms")
         )
         keyboard.row(
             types.InlineKeyboardButton("Update Channel", url=UPDATE_CHANNEL_URL),
