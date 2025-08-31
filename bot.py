@@ -9,7 +9,7 @@ client = MongoClient(MONGO_URI)
 db = client['escrow_bot']
 users_collection = db['users']
 
-AVAILABLE_COMMANDS 🤖 = """📌 AVAILABLE COMMANDS
+AVAILABLE_COMMANDS = """📌 AVAILABLE COMMANDS
 
 /start - A command to start interacting with the bot
 /whatisescrow - A command to tell you more about escrow
