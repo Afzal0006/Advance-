@@ -1,5 +1,6 @@
 from telebot import TeleBot, types
 from pymongo import MongoClient
+import re
 
 # ================= CONFIG =================
 BOT_TOKEN = "6098583669:AAE64kFMI_JE6BpgUKyBszq13LdvTgfnsjY"
@@ -119,6 +120,71 @@ def start_deal(message):
         f"Hello {user_tag},\nKindly tell deal details i.e.\n\n"
         "Quantity -\nRate -\nConditions (if any) -\n\n"
         "Remember without it disputes wouldn’t be resolved. Once filled, proceed with /seller or /buyer [CRYPTO ADDRESS]"
+    )
+
+# ================= /seller COMMAND =================
+@bot.message_handler(commands=['seller'])
+def set_seller(message):
+    args = message.text.split()
+    if len(args) < 2:
+        bot.reply_to(message, "❌ Please provide your wallet address. Example:\n/seller {BEP20_ADDRESS}")
+        return
+    seller_address = args[1]
+
+    if not re.match(r"^0x[a-fA-F0-9]{40}$", seller_address):
+        bot.reply_to(message, "❌ Invalid address format! Please provide a correct BEP20 address.")
+        return
+
+    user_tag = f"<a href='tg://user?id={message.from_user.id}'>{message.from_user.first_name}</a>"
+
+    deals_collection.update_one(
+        {"chat_id": message.chat.id},
+        {"$set": {"seller_id": message.from_user.id, "seller_address": seller_address}},
+        upsert=True
+    )
+
+    deal = deals_collection.find_one({"chat_id": message.chat.id})
+    buyer_address = deal.get("buyer_address") if deal else None
+
+    bot.send_message(
+        message.chat.id,
+        f"📍ESCROW-ROLE DECLARATION\n\n"
+        f"⚡️ SELLER {message.from_user.first_name}\n"
+        f"User ID {message.from_user.id}\n\n"
+        f"✅ SELLER WALLET\n{seller_address}\n\n"
+        "Note: If you don't see any address, then your address will be used from saved addresses after selecting token and chain for the current escrow.\n\n"
+        f"{'Buyer already set: ' + buyer_address if buyer_address else 'Please set buyer using /buyer [DEPOSIT ADDRESS]'}",
+        parse_mode="HTML"
+    )
+
+# ================= /buyer COMMAND =================
+@bot.message_handler(commands=['buyer'])
+def set_buyer(message):
+    args = message.text.split()
+    if len(args) < 2:
+        bot.reply_to(message, "❌ Please provide buyer wallet address. Example:\n/buyer {BEP20_ADDRESS}")
+        return
+    buyer_address = args[1]
+
+    if not re.match(r"^0x[a-fA-F0-9]{40}$", buyer_address):
+        bot.reply_to(message, "❌ Invalid address format! Please provide a correct BEP20 address.")
+        return
+
+    deals_collection.update_one(
+        {"chat_id": message.chat.id},
+        {"$set": {"buyer_id": message.from_user.id, "buyer_address": buyer_address}},
+        upsert=True
+    )
+
+    bot.send_message(
+        message.chat.id,
+        f"📍ESCROW-ROLE DECLARATION\n\n"
+        f"⚡️ BUYER {message.from_user.first_name}\n"
+        f"User ID {message.from_user.id}\n\n"
+        f"✅ BUYER WALLET\n{buyer_address}\n\n"
+        "Note: If you don't see any address, then your address will be used from saved addresses after selecting token and chain for the current escrow.\n\n"
+        "Seller should already be set using /seller [ADDRESS]",
+        parse_mode="HTML"
     )
 
 # ================= GROUP WELCOME =================
