@@ -47,8 +47,33 @@ CONTACT_TEXT = """☎️ CONTACT ARBITRATOR
 💡 Incase you're not getting a response, you can reach out to @golgibody
 """
 
-UPDATE_CHANNEL_URL = "https://t.me/YOUR_UPDATE_CHANNEL"  # Replace with your update channel link
-VOUCH_CHANNEL_URL = "https://t.me/YOUR_VOUCH_CHANNEL"    # Replace with your vouch channel link
+INSTRUCTIONS_TEXT = """📘 GUIDE “HOW TO USE (Escrow Bot)” FOR SAFE AND FASTEST HASSLE-FREE ESCROW 🚀
+
+Step 1 : Use /escrow command in the DM of the Bot.  
+( It will auto-create a safe escrow group and drop the link so that buyer and seller can join via that link. ) 🔗👥  
+
+Step 2 : Use /dd command to initiate the process of escrow where you will get the format to express your deal and info.  
+( It will include quantity, rate, TnC’s agreed upon by both parties. ) 📝🤝  
+
+Step 3 : Use /buyer (your address) if you are a buyer 🛒 or /seller (your address) if you are a seller 🏪 to verify address and continue the deal.  
+( Provide your crypto address which will be used in case of release or refund. ) 💳🔐  
+
+Step 4 : Choose the token and network by /token command and then either party has to accept it. ✅💱  
+
+Step 5 : Use /deposit command to deposit the asset within the bot.  
+( Note : Bot will give the deposit address and it has a time limit to deposit ⏳, you have to deposit within that given time. ) ⏰💸  
+
+Step 6 : Once verified by the bot, you can continue the deal.  
+( Bot will send the real-time deposit details in the chat. ) 📊💬  
+
+Step 7 : After a successful deal, you can release the asset to the party by using /release (amount/all).  
+( Thus, the bot will itself release the asset to the party and send the verification in the chat. ) 🎉💼  
+
+🚨 IN CASE OF ANY DISPUTE OR ISSUE, YOU CAN FEEL FREE TO USE /dispute COMMAND, AND SUPPORT WILL JOIN YOU SHORTLY. 🛎️👩‍💻
+"""
+
+UPDATE_CHANNEL_URL = "https://t.me/YOUR_UPDATE_CHANNEL"
+VOUCH_CHANNEL_URL = "https://t.me/YOUR_VOUCH_CHANNEL"
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
@@ -63,7 +88,7 @@ def send_welcome(message):
     keyboard = types.InlineKeyboardMarkup()
     keyboard.add(types.InlineKeyboardButton("Available Commands", callback_data="show_commands"))
     keyboard.add(types.InlineKeyboardButton("☎️ Contact", callback_data="show_contact"))
-    # Two inline link buttons in one row
+    keyboard.add(types.InlineKeyboardButton("Instructions", callback_data="show_instructions"))
     keyboard.row(
         types.InlineKeyboardButton("Update Channel", url=UPDATE_CHANNEL_URL),
         types.InlineKeyboardButton("Vouch Channel", url=VOUCH_CHANNEL_URL)
@@ -80,10 +105,15 @@ def callback_query(call):
         keyboard = types.InlineKeyboardMarkup()
         keyboard.add(types.InlineKeyboardButton("Back 🔙", callback_data="back_start"))
         bot.edit_message_text(CONTACT_TEXT, call.message.chat.id, call.message.message_id, reply_markup=keyboard)
+    elif call.data == "show_instructions":
+        keyboard = types.InlineKeyboardMarkup()
+        keyboard.add(types.InlineKeyboardButton("Back 🔙", callback_data="back_start"))
+        bot.edit_message_text(INSTRUCTIONS_TEXT, call.message.chat.id, call.message.message_id, reply_markup=keyboard)
     elif call.data == "back_start":
         keyboard = types.InlineKeyboardMarkup()
         keyboard.add(types.InlineKeyboardButton("Available Commands", callback_data="show_commands"))
         keyboard.add(types.InlineKeyboardButton("☎️ Contact", callback_data="show_contact"))
+        keyboard.add(types.InlineKeyboardButton("Instructions", callback_data="show_instructions"))
         keyboard.row(
             types.InlineKeyboardButton("Update Channel", url=UPDATE_CHANNEL_URL),
             types.InlineKeyboardButton("Vouch Channel", url=VOUCH_CHANNEL_URL)
