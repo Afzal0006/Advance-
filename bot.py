@@ -47,6 +47,9 @@ CONTACT_TEXT = """☎️ CONTACT ARBITRATOR
 💡 Incase you're not getting a response, you can reach out to @golgibody
 """
 
+UPDATE_CHANNEL_URL = "https://t.me/YOUR_UPDATE_CHANNEL"  # Replace with your update channel link
+VOUCH_CHANNEL_URL = "https://t.me/YOUR_VOUCH_CHANNEL"    # Replace with your vouch channel link
+
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     user_id = message.from_user.id
@@ -60,6 +63,11 @@ def send_welcome(message):
     keyboard = types.InlineKeyboardMarkup()
     keyboard.add(types.InlineKeyboardButton("Available Commands", callback_data="show_commands"))
     keyboard.add(types.InlineKeyboardButton("☎️ Contact", callback_data="show_contact"))
+    # Two inline link buttons in one row
+    keyboard.row(
+        types.InlineKeyboardButton("Update Channel", url=UPDATE_CHANNEL_URL),
+        types.InlineKeyboardButton("Vouch Channel", url=VOUCH_CHANNEL_URL)
+    )
     bot.send_message(message.chat.id, "Your Trustworthy Telegram Escrow Service", reply_markup=keyboard)
 
 @bot.callback_query_handler(func=lambda call: True)
@@ -76,6 +84,10 @@ def callback_query(call):
         keyboard = types.InlineKeyboardMarkup()
         keyboard.add(types.InlineKeyboardButton("Available Commands", callback_data="show_commands"))
         keyboard.add(types.InlineKeyboardButton("☎️ Contact", callback_data="show_contact"))
+        keyboard.row(
+            types.InlineKeyboardButton("Update Channel", url=UPDATE_CHANNEL_URL),
+            types.InlineKeyboardButton("Vouch Channel", url=VOUCH_CHANNEL_URL)
+        )
         bot.edit_message_text("Your Trustworthy Telegram Escrow Service", call.message.chat.id, call.message.message_id, reply_markup=keyboard)
 
 bot.polling()
