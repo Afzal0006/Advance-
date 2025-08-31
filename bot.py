@@ -81,6 +81,10 @@ Our terms of usage are simple.
 UPDATE_CHANNEL_URL = "https://t.me/YOUR_UPDATE_CHANNEL"
 VOUCH_CHANNEL_URL = "https://t.me/YOUR_VOUCH_CHANNEL"
 
+# ================= HELPERS =================
+def tag_user(message):
+    return f"<a href='tg://user?id={message.from_user.id}'>{message.from_user.first_name}</a>"
+
 # ================= START COMMAND =================
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
@@ -109,7 +113,7 @@ def send_welcome(message):
 # ================= /dd COMMAND =================
 @bot.message_handler(commands=['dd'])
 def start_deal(message):
-    user_tag = f"<a href='tg://user?id={message.from_user.id}'>{message.from_user.first_name}</a>"
+    user_tag = tag_user(message)
     deals_collection.update_one(
         {"chat_id": message.chat.id},
         {"$set": {"dd_started": True, "user_id": message.from_user.id}},
@@ -125,17 +129,21 @@ def start_deal(message):
 # ================= /seller COMMAND =================
 @bot.message_handler(commands=['seller'])
 def set_seller(message):
+    user_tag = tag_user(message)
     args = message.text.split()
     if len(args) < 2:
-        bot.reply_to(message, "❌ Please provide your wallet address. Example:\n/seller {BEP20_ADDRESS}")
+        bot.reply_to(message, f"{user_tag} ❌ Provide your wallet. Example: /seller {{BEP20_ADDRESS}}")
         return
     seller_address = args[1]
 
     if not re.match(r"^0x[a-fA-F0-9]{40}$", seller_address):
-        bot.reply_to(message, "❌ Invalid address format! Please provide a correct BEP20 address.")
+        bot.reply_to(message, f"{user_tag} ❌ Invalid BEP20 address!")
         return
 
-    user_tag = f"<a href='tg://user?id={message.from_user.id}'>{message.from_user.first_name}</a>"
+    deal = deals_collection.find_one({"chat_id": message.chat.id})
+    if deal and deal.get("seller_address"):
+        bot.reply_to(message, f"{user_tag} ❌ Seller address already set for this group!")
+        return
 
     deals_collection.update_one(
         {"chat_id": message.chat.id},
@@ -143,16 +151,12 @@ def set_seller(message):
         upsert=True
     )
 
-    deal = deals_collection.find_one({"chat_id": message.chat.id})
     buyer_address = deal.get("buyer_address") if deal else None
 
     bot.send_message(
         message.chat.id,
-        f"📍ESCROW-ROLE DECLARATION\n\n"
-        f"⚡️ SELLER {message.from_user.first_name}\n"
-        f"User ID {message.from_user.id}\n\n"
-        f"✅ SELLER WALLET\n{seller_address}\n\n"
-        "Note: If you don't see any address, then your address will be used from saved addresses after selecting token and chain for the current escrow.\n\n"
+        f"📍ESCROW-ROLE DECLARATION\n\n⚡️ SELLER {message.from_user.first_name}\n"
+        f"User ID {message.from_user.id}\n\n✅ SELLER WALLET\n{seller_address}\n\n"
         f"{'Buyer already set: ' + buyer_address if buyer_address else 'Please set buyer using /buyer [DEPOSIT ADDRESS]'}",
         parse_mode="HTML"
     )
@@ -160,14 +164,20 @@ def set_seller(message):
 # ================= /buyer COMMAND =================
 @bot.message_handler(commands=['buyer'])
 def set_buyer(message):
+    user_tag = tag_user(message)
     args = message.text.split()
     if len(args) < 2:
-        bot.reply_to(message, "❌ Please provide buyer wallet address. Example:\n/buyer {BEP20_ADDRESS}")
+        bot.reply_to(message, f"{user_tag} ❌ Provide buyer wallet. Example: /buyer {{BEP20_ADDRESS}}")
         return
     buyer_address = args[1]
 
     if not re.match(r"^0x[a-fA-F0-9]{40}$", buyer_address):
-        bot.reply_to(message, "❌ Invalid address format! Please provide a correct BEP20 address.")
+        bot.reply_to(message, f"{user_tag} ❌ Invalid BEP20 address!")
+        return
+
+    deal = deals_collection.find_one({"chat_id": message.chat.id})
+    if deal and deal.get("buyer_address"):
+        bot.reply_to(message, f"{user_tag} ❌ Buyer address already set for this group!")
         return
 
     deals_collection.update_one(
@@ -178,11 +188,8 @@ def set_buyer(message):
 
     bot.send_message(
         message.chat.id,
-        f"📍ESCROW-ROLE DECLARATION\n\n"
-        f"⚡️ BUYER {message.from_user.first_name}\n"
-        f"User ID {message.from_user.id}\n\n"
-        f"✅ BUYER WALLET\n{buyer_address}\n\n"
-        "Note: If you don't see any address, then your address will be used from saved addresses after selecting token and chain for the current escrow.\n\n"
+        f"📍ESCROW-ROLE DECLARATION\n\n⚡️ BUYER {message.from_user.first_name}\n"
+        f"User ID {message.from_user.id}\n\n✅ BUYER WALLET\n{buyer_address}\n\n"
         "Seller should already be set using /seller [ADDRESS]",
         parse_mode="HTML"
     )
