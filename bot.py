@@ -120,12 +120,12 @@ def send_welcome(message):
             "joined_at": message.date
         })
     keyboard = types.InlineKeyboardMarkup()
-    keyboard.add(types.InlineKeyboardButton("Available Commands", callback_data="show_commands"))
+    keyboard.add(types.InlineKeyboardButton("🤖 Available Commands", callback_data="show_commands"))
     keyboard.add(types.InlineKeyboardButton("☎️ Contact", callback_data="show_contact"))
     # Instructions and Terms in one row
     keyboard.row(
-        types.InlineKeyboardButton("Instructions", callback_data="show_instructions"),
-        types.InlineKeyboardButton("Terms", callback_data="show_terms")
+        types.InlineKeyboardButton("👨🏻‍🏫Instructions", callback_data="show_instructions"),
+        types.InlineKeyboardButton("📗Terms", callback_data="show_terms")
     )
     # Update and Vouch channels in one row
     keyboard.row(
