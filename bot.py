@@ -14,10 +14,9 @@ deals_collection = db['deals']
 
 # ================= TEXTS =================
 AVAILABLE_COMMANDS = """📌 AVAILABLE COMMANDS
-
-/start - Start interacting with the bot
+/start - Start interacting
 /whatisescrow - Learn about escrow
-/instructions - Guide for using bot
+/instructions - Guide
 /terms - Bot TOS
 /dispute - Contact admins
 /menu - Show menu
@@ -29,7 +28,7 @@ AVAILABLE_COMMANDS = """📌 AVAILABLE COMMANDS
 /tradeid - Get trade ID
 /dd - Add deal details
 /escrow - Escrow group link
-/token - Select token for escrow
+/token - Select token
 /deposit - Deposit address
 /verify - Verify wallet
 /balance - Check balance
@@ -38,44 +37,35 @@ AVAILABLE_COMMANDS = """📌 AVAILABLE COMMANDS
 /seller - Set seller
 /buyer - Set buyer
 /setfee - Set custom fee
-/save - Save default addresses
+/save - Save addresses
 /saved - Check saved addresses
 /referral - Check referrals
 """
 
 CONTACT_TEXT = """☎️ CONTACT ARBITRATOR
-
 💬 Type /dispute
-
-💡 Incase you're not getting a response, reach out to @golgibody
+💡 Reach out to @golgibody if no response
 """
 
-INSTRUCTIONS_TEXT = """📘 GUIDE “HOW TO USE (Escrow Bot)” FOR SAFE AND FASTEST HASSLE-FREE ESCROW 🚀
-
-Step 1 : Use /escrow command in the DM of the Bot.  
-Step 2 : Use /dd command to initiate escrow.  
-Step 3 : Use /buyer or /seller to verify address.  
-Step 4 : Choose token/network with /token.  
-Step 5 : Use /deposit to deposit the asset.  
-Step 6 : Once verified, continue the deal.  
-Step 7 : After success, release asset with /release.  
-
-🚨 Use /dispute if any issue arises.
+INSTRUCTIONS_TEXT = """📘 GUIDE “HOW TO USE (Escrow Bot)” 🚀
+1. Use /escrow command in DM
+2. /dd to initiate escrow
+3. /buyer or /seller to verify address
+4. /token to choose token/network
+5. /deposit to deposit asset
+6. Continue deal after verification
+7. /release to release asset
+🚨 Use /dispute if any issue
 """
 
 TERMS_TEXT = """📜 TERMS
-
-Our terms of usage are simple.
-
-🎟 Fees
-1.0% for P2P and 1.0% for OTC Flat. Transactions fee applies.
-
-1️⃣ Record testing or screenshots to provide evidence.  
-2️⃣ Learn what you are buying.  
-3️⃣ Buyer should release funds only after receiving the item.  
-4️⃣ Use trusted wallets to avoid issues.  
-5️⃣ Fees are taken from wallet balance.  
-6️⃣ Ensure coin/network match for buyer and seller.
+🎟 Fees 1.0% for P2P & OTC Flat
+1️⃣ Record testing screenshots
+2️⃣ Learn what you buy
+3️⃣ Release funds only after receiving item
+4️⃣ Use trusted wallets
+5️⃣ Fees taken from wallet balance
+6️⃣ Ensure coin/network match
 """
 
 UPDATE_CHANNEL_URL = "https://t.me/YOUR_UPDATE_CHANNEL"
@@ -85,180 +75,136 @@ VOUCH_CHANNEL_URL = "https://t.me/YOUR_VOUCH_CHANNEL"
 def tag_user(message):
     return f"<a href='tg://user?id={message.from_user.id}'>{message.from_user.first_name}</a>"
 
-# ================= START COMMAND =================
+# ================= START =================
 @bot.message_handler(commands=['start'])
-def send_welcome(message):
+def start(message):
     user_id = message.from_user.id
     username = message.from_user.username
     if not users_collection.find_one({"user_id": user_id}):
-        users_collection.insert_one({
-            "user_id": user_id,
-            "username": username,
-            "joined_at": message.date
-        })
+        users_collection.insert_one({"user_id": user_id, "username": username, "joined_at": message.date})
 
-    keyboard = types.InlineKeyboardMarkup()
-    keyboard.add(types.InlineKeyboardButton("Available Commands", callback_data="show_commands"))
-    keyboard.add(types.InlineKeyboardButton("☎️ Contact", callback_data="show_contact"))
-    keyboard.row(
-        types.InlineKeyboardButton("Instructions", callback_data="show_instructions"),
-        types.InlineKeyboardButton("Terms", callback_data="show_terms")
-    )
-    keyboard.row(
-        types.InlineKeyboardButton("Update Channel", url=UPDATE_CHANNEL_URL),
-        types.InlineKeyboardButton("Vouch Channel", url=VOUCH_CHANNEL_URL)
-    )
-    bot.send_message(message.chat.id, "Your Trustworthy Telegram Escrow Service", reply_markup=keyboard)
+    kb = types.InlineKeyboardMarkup()
+    kb.add(types.InlineKeyboardButton("Available Commands", callback_data="show_commands"))
+    kb.add(types.InlineKeyboardButton("☎️ Contact", callback_data="show_contact"))
+    kb.row(types.InlineKeyboardButton("Instructions", callback_data="show_instructions"),
+           types.InlineKeyboardButton("Terms", callback_data="show_terms"))
+    kb.row(types.InlineKeyboardButton("Update Channel", url=UPDATE_CHANNEL_URL),
+           types.InlineKeyboardButton("Vouch Channel", url=VOUCH_CHANNEL_URL))
+    bot.send_message(message.chat.id, "Your Trustworthy Telegram Escrow Service", reply_markup=kb)
 
-# ================= /dd COMMAND =================
+# ================= /dd =================
 @bot.message_handler(commands=['dd'])
-def start_deal(message):
+def dd(message):
     user_tag = tag_user(message)
-    deals_collection.update_one(
-        {"chat_id": message.chat.id},
-        {"$set": {"dd_started": True, "user_id": message.from_user.id}},
-        upsert=True
-    )
-    bot.send_message(
-        message.chat.id,
-        f"Hello {user_tag},\nKindly tell deal details i.e.\n\n"
-        "Quantity -\nRate -\nConditions (if any) -\n\n"
-        "Remember without it disputes wouldn’t be resolved. Once filled, proceed with /seller or /buyer [CRYPTO ADDRESS]"
-    )
+    deals_collection.update_one({"chat_id": message.chat.id},
+                                {"$set": {"dd_started": True, "user_id": message.from_user.id}}, upsert=True)
+    bot.send_message(message.chat.id,
+                     f"Hello {user_tag},\nKindly tell deal details:\nQuantity -\nRate -\nConditions (if any) -\n\n"
+                     "Once filled, proceed with /seller or /buyer [CRYPTO ADDRESS]")
 
-# ================= /seller COMMAND =================
+# ================= /seller =================
 @bot.message_handler(commands=['seller'])
-def set_seller(message):
+def seller(message):
     user_tag = tag_user(message)
     args = message.text.split()
     if len(args) < 2:
-        bot.reply_to(message, f"{user_tag} ❌ Provide your wallet. Example: /seller {{BEP20_ADDRESS}}", parse_mode="HTML")
+        bot.send_message(message.chat.id, f"{user_tag} ❌ Provide wallet. Example: /seller {{BEP20_ADDRESS}}", parse_mode="HTML")
         return
-    seller_address = args[1]
 
+    seller_address = args[1]
     if not re.match(r"^0x[a-fA-F0-9]{40}$", seller_address):
-        bot.reply_to(message, f"{user_tag} ❌ Invalid BEP20 address!", parse_mode="HTML")
+        bot.send_message(message.chat.id, f"{user_tag} ❌ Invalid BEP20 address!", parse_mode="HTML")
         return
 
     deal = deals_collection.find_one({"chat_id": message.chat.id})
-
     if deal and deal.get("seller_address"):
-        bot.reply_to(message, f"{user_tag} ❌ Seller already set!", parse_mode="HTML")
+        bot.send_message(message.chat.id, f"{user_tag} ❌ Seller already set!", parse_mode="HTML")
         return
-
     if deal and deal.get("buyer_id") == message.from_user.id:
-        bot.reply_to(message, f"{user_tag} ❌ You are already buyer! Cannot be seller too.", parse_mode="HTML")
+        bot.send_message(message.chat.id, f"{user_tag} ❌ Already buyer! Cannot be seller.", parse_mode="HTML")
         return
-
     if deal and (deal.get("seller_address") == seller_address or deal.get("buyer_address") == seller_address):
-        bot.reply_to(message, f"{user_tag} ❌ This wallet address is already used!", parse_mode="HTML")
+        bot.send_message(message.chat.id, f"{user_tag} ❌ Wallet already used!", parse_mode="HTML")
         return
 
-    deals_collection.update_one(
-        {"chat_id": message.chat.id},
-        {"$set": {"seller_id": message.from_user.id, "seller_address": seller_address}},
-        upsert=True
-    )
-
+    deals_collection.update_one({"chat_id": message.chat.id},
+                                {"$set": {"seller_id": message.from_user.id, "seller_address": seller_address}},
+                                upsert=True)
     buyer_address = deal.get("buyer_address") if deal else None
-
-    msg = (
-        f"📍ESCROW-ROLE DECLARATION\n\n"
-        f"⚡️ SELLER {user_tag}\n"
-        f"User ID {message.from_user.id}\n\n"
-        f"✅ SELLER WALLET\n{seller_address}\n\n"
-        f"{'Buyer already set: ' + buyer_address if buyer_address else 'Please set buyer using /buyer [DEPOSIT ADDRESS]'}"
-    )
+    msg = (f"📍ESCROW-ROLE DECLARATION\n\n⚡️ SELLER {user_tag}\nUser ID {message.from_user.id}\n\n"
+           f"✅ SELLER WALLET\n{seller_address}\n\n"
+           f"{'Buyer already set: ' + buyer_address if buyer_address else 'Please set buyer using /buyer [DEPOSIT ADDRESS]'}")
     bot.send_message(message.chat.id, msg, parse_mode="HTML")
 
-# ================= /buyer COMMAND =================
+# ================= /buyer =================
 @bot.message_handler(commands=['buyer'])
-def set_buyer(message):
+def buyer(message):
     user_tag = tag_user(message)
     args = message.text.split()
     if len(args) < 2:
-        bot.reply_to(message, f"{user_tag} ❌ Provide buyer wallet. Example: /buyer {{BEP20_ADDRESS}}", parse_mode="HTML")
+        bot.send_message(message.chat.id, f"{user_tag} ❌ Provide wallet. Example: /buyer {{BEP20_ADDRESS}}", parse_mode="HTML")
         return
-    buyer_address = args[1]
 
+    buyer_address = args[1]
     if not re.match(r"^0x[a-fA-F0-9]{40}$", buyer_address):
-        bot.reply_to(message, f"{user_tag} ❌ Invalid BEP20 address!", parse_mode="HTML")
+        bot.send_message(message.chat.id, f"{user_tag} ❌ Invalid BEP20 address!", parse_mode="HTML")
         return
 
     deal = deals_collection.find_one({"chat_id": message.chat.id})
-
     if deal and deal.get("buyer_address"):
-        bot.reply_to(message, f"{user_tag} ❌ Buyer already set!", parse_mode="HTML")
+        bot.send_message(message.chat.id, f"{user_tag} ❌ Buyer already set!", parse_mode="HTML")
         return
-
     if deal and deal.get("seller_id") == message.from_user.id:
-        bot.reply_to(message, f"{user_tag} ❌ You are already seller! Cannot be buyer too.", parse_mode="HTML")
+        bot.send_message(message.chat.id, f"{user_tag} ❌ Already seller! Cannot be buyer.", parse_mode="HTML")
         return
-
     if deal and (deal.get("seller_address") == buyer_address or deal.get("buyer_address") == buyer_address):
-        bot.reply_to(message, f"{user_tag} ❌ This wallet address is already used!", parse_mode="HTML")
+        bot.send_message(message.chat.id, f"{user_tag} ❌ Wallet already used!", parse_mode="HTML")
         return
 
-    deals_collection.update_one(
-        {"chat_id": message.chat.id},
-        {"$set": {"buyer_id": message.from_user.id, "buyer_address": buyer_address}},
-        upsert=True
-    )
-
+    deals_collection.update_one({"chat_id": message.chat.id},
+                                {"$set": {"buyer_id": message.from_user.id, "buyer_address": buyer_address}},
+                                upsert=True)
     seller_address = deal.get("seller_address") if deal else None
-
-    msg = (
-        f"📍ESCROW-ROLE DECLARATION\n\n"
-        f"⚡️ BUYER {user_tag}\n"
-        f"User ID {message.from_user.id}\n\n"
-        f"✅ BUYER WALLET\n{buyer_address}\n\n"
-        f"{'Seller already set: ' + seller_address if seller_address else 'Seller should set /seller [ADDRESS]'}"
-    )
+    msg = (f"📍ESCROW-ROLE DECLARATION\n\n⚡️ BUYER {user_tag}\nUser ID {message.from_user.id}\n\n"
+           f"✅ BUYER WALLET\n{buyer_address}\n\n"
+           f"{'Seller already set: ' + seller_address if seller_address else 'Seller should set /seller [ADDRESS]'}")
     bot.send_message(message.chat.id, msg, parse_mode="HTML")
 
 # ================= GROUP WELCOME =================
 @bot.my_chat_member_handler()
-def welcome_new_group(update):
+def welcome(update):
     if update.new_chat_member.status == "member":
-        chat_id = update.chat.id
-        bot.send_message(
-            chat_id,
-            "📍 Hey there traders! Welcome to our escrow service.\n"
-            "✅ Please start with /dd command and fill the DealInfo Form"
-        )
+        bot.send_message(update.chat.id,
+                         "📍 Hey traders! Welcome to escrow.\n✅ Please start with /dd and fill the DealInfo Form")
 
-# ================= CALLBACKS FOR BUTTONS =================
+# ================= BUTTON CALLBACKS =================
 @bot.callback_query_handler(func=lambda call: True)
-def callback_query(call):
+def callbacks(call):
     if call.data == "show_commands":
-        keyboard = types.InlineKeyboardMarkup()
-        keyboard.add(types.InlineKeyboardButton("Back 🔙", callback_data="back_start"))
-        bot.edit_message_text(AVAILABLE_COMMANDS, call.message.chat.id, call.message.message_id, reply_markup=keyboard)
+        kb = types.InlineKeyboardMarkup()
+        kb.add(types.InlineKeyboardButton("Back 🔙", callback_data="back_start"))
+        bot.edit_message_text(AVAILABLE_COMMANDS, call.message.chat.id, call.message.message_id, reply_markup=kb)
     elif call.data == "show_contact":
-        keyboard = types.InlineKeyboardMarkup()
-        keyboard.add(types.InlineKeyboardButton("Back 🔙", callback_data="back_start"))
-        bot.edit_message_text(CONTACT_TEXT, call.message.chat.id, call.message.message_id, reply_markup=keyboard)
+        kb = types.InlineKeyboardMarkup()
+        kb.add(types.InlineKeyboardButton("Back 🔙", callback_data="back_start"))
+        bot.edit_message_text(CONTACT_TEXT, call.message.chat.id, call.message.message_id, reply_markup=kb)
     elif call.data == "show_instructions":
-        keyboard = types.InlineKeyboardMarkup()
-        keyboard.add(types.InlineKeyboardButton("Back 🔙", callback_data="back_start"))
-        bot.edit_message_text(INSTRUCTIONS_TEXT, call.message.chat.id, call.message.message_id, reply_markup=keyboard)
+        kb = types.InlineKeyboardMarkup()
+        kb.add(types.InlineKeyboardButton("Back 🔙", callback_data="back_start"))
+        bot.edit_message_text(INSTRUCTIONS_TEXT, call.message.chat.id, call.message.message_id, reply_markup=kb)
     elif call.data == "show_terms":
-        keyboard = types.InlineKeyboardMarkup()
-        keyboard.add(types.InlineKeyboardButton("Back 🔙", callback_data="back_start"))
-        bot.edit_message_text(TERMS_TEXT, call.message.chat.id, call.message.message_id, reply_markup=keyboard)
+        kb = types.InlineKeyboardMarkup()
+        kb.add(types.InlineKeyboardButton("Back 🔙", callback_data="back_start"))
+        bot.edit_message_text(TERMS_TEXT, call.message.chat.id, call.message.message_id, reply_markup=kb)
     elif call.data == "back_start":
-        keyboard = types.InlineKeyboardMarkup()
-        keyboard.add(types.InlineKeyboardButton("Available Commands", callback_data="show_commands"))
-        keyboard.add(types.InlineKeyboardButton("☎️ Contact", callback_data="show_contact"))
-        keyboard.row(
-            types.InlineKeyboardButton("Instructions", callback_data="show_instructions"),
-            types.InlineKeyboardButton("Terms", callback_data="show_terms")
-        )
-        keyboard.row(
-            types.InlineKeyboardButton("Update Channel", url=UPDATE_CHANNEL_URL),
-            types.InlineKeyboardButton("Vouch Channel", url=VOUCH_CHANNEL_URL)
-        )
-        bot.edit_message_text("Your Trustworthy Telegram Escrow Service", call.message.chat.id, call.message.message_id, reply_markup=keyboard)
+        kb = types.InlineKeyboardMarkup()
+        kb.add(types.InlineKeyboardButton("Available Commands", callback_data="show_commands"))
+        kb.add(types.InlineKeyboardButton("☎️ Contact", callback_data="show_contact"))
+        kb.row(types.InlineKeyboardButton("Instructions", callback_data="show_instructions"),
+               types.InlineKeyboardButton("Terms", callback_data="show_terms"))
+        kb.row(types.InlineKeyboardButton("Update Channel", url=UPDATE_CHANNEL_URL),
+               types.InlineKeyboardButton("Vouch Channel", url=VOUCH_CHANNEL_URL))
+        bot.edit_message_text("Your Trustworthy Telegram Escrow Service", call.message.chat.id, call.message.message_id, reply_markup=kb)
 
 # ================= POLLING =================
 bot.polling(non_stop=True, allowed_updates=["message", "callback_query", "my_chat_member"])
