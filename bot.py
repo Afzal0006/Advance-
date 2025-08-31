@@ -2,7 +2,7 @@ from telebot import TeleBot
 from pymongo import MongoClient
 from datetime import datetime
 
-BOT_TOKEN = "8350094964:AAE-ebwWQBx_YWnW_stEqcxiKKVVx8SZaAw"
+BOT_TOKEN = "8269236510:AAHhnjm_jTFKDFnLY0kmwlISzBib0fV55pg"
 MONGO_URI = "mongodb+srv://afzal99550:afzal99550@cluster0.aqmbh9q.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 
 bot = TeleBot(BOT_TOKEN, parse_mode="HTML")
