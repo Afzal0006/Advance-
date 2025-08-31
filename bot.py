@@ -72,6 +72,40 @@ Step 7 : After a successful deal, you can release the asset to the party by usin
 🚨 IN CASE OF ANY DISPUTE OR ISSUE, YOU CAN FEEL FREE TO USE /dispute COMMAND, AND SUPPORT WILL JOIN YOU SHORTLY. 🛎️👩‍💻
 """
 
+TERMS_TEXT = """📜 TERMS
+
+Our terms of usage are simple.
+
+🎟 Fees
+1.0% for P2P and 1.0% for OTC Flat.
+
+Transactions fee will be applicable.
+
+TAKE THIS INTO ACCOUNT WHEN DEPOSITING FUNDS
+
+1️⃣ Record/screenshot the desktop while your perform any testing of logins or data, or recording of physical items being opened, this is to provide evidence that the data does not work, if the data is working and you are happy to release the funds, you can delete the recording.
+
+FAILURE TO PRODUCE SUFFICIENT EVIDENCE OF TESTING WILL RESULT IN LOSS OF FUNDS
+
+2️⃣ Before you purchase any information, please take the time to learn what you are buying
+
+IT IS NOT THE RESPONSIBILITY OF THE SELLER TO EXPLAIN HOW TO USE THE INFORMATION, ALTHOUGH IT MAY HELP MAKE TRANSACTIONS RUN SMOOTHER IF VENDORS HELP BUYERS
+
+3️⃣ Buyer should ONLY EVER release funds when they RECEIVE WHAT YOU PAID FOR.
+
+WE ARE NOT RESPONSIBLE FOR YOU RELEASING EARLY AND CAN NOT RETRIEVE FUNDS BACK
+
+4️⃣ Users should use trusted local wallets such as electrum.org or exodus wallet to prevent any issues with KYC wallets like Coinbase or Paxful.
+
+ONLINE WALLETS CAN BE SLOW AND BLOCK ACCOUNTS
+
+5️⃣ Our fee's are taken from the balance in the wallet (1.0% for P2P and 1.0% for OTC), so make sure you take that into account when depositing funds.
+
+WE ARE A SERVICE BARE THAT IN MIND
+
+6️⃣ Make sure Coin and Network are same for Buyer and Seller, else you may lose your funds.
+"""
+
 UPDATE_CHANNEL_URL = "https://t.me/YOUR_UPDATE_CHANNEL"
 VOUCH_CHANNEL_URL = "https://t.me/YOUR_VOUCH_CHANNEL"
 
@@ -88,7 +122,12 @@ def send_welcome(message):
     keyboard = types.InlineKeyboardMarkup()
     keyboard.add(types.InlineKeyboardButton("Available Commands", callback_data="show_commands"))
     keyboard.add(types.InlineKeyboardButton("☎️ Contact", callback_data="show_contact"))
-    keyboard.add(types.InlineKeyboardButton("Instructions", callback_data="show_instructions"))
+    # Instructions and Terms in one row
+    keyboard.row(
+        types.InlineKeyboardButton("Instructions", callback_data="show_instructions"),
+        types.InlineKeyboardButton("Terms", callback_data="show_terms")
+    )
+    # Update and Vouch channels in one row
     keyboard.row(
         types.InlineKeyboardButton("Update Channel", url=UPDATE_CHANNEL_URL),
         types.InlineKeyboardButton("Vouch Channel", url=VOUCH_CHANNEL_URL)
@@ -109,11 +148,18 @@ def callback_query(call):
         keyboard = types.InlineKeyboardMarkup()
         keyboard.add(types.InlineKeyboardButton("Back 🔙", callback_data="back_start"))
         bot.edit_message_text(INSTRUCTIONS_TEXT, call.message.chat.id, call.message.message_id, reply_markup=keyboard)
+    elif call.data == "show_terms":
+        keyboard = types.InlineKeyboardMarkup()
+        keyboard.add(types.InlineKeyboardButton("Back 🔙", callback_data="back_start"))
+        bot.edit_message_text(TERMS_TEXT, call.message.chat.id, call.message.message_id, reply_markup=keyboard)
     elif call.data == "back_start":
         keyboard = types.InlineKeyboardMarkup()
         keyboard.add(types.InlineKeyboardButton("Available Commands", callback_data="show_commands"))
         keyboard.add(types.InlineKeyboardButton("☎️ Contact", callback_data="show_contact"))
-        keyboard.add(types.InlineKeyboardButton("Instructions", callback_data="show_instructions"))
+        keyboard.row(
+            types.InlineKeyboardButton("Instructions", callback_data="show_instructions"),
+            types.InlineKeyboardButton("Terms", callback_data="show_terms")
+        )
         keyboard.row(
             types.InlineKeyboardButton("Update Channel", url=UPDATE_CHANNEL_URL),
             types.InlineKeyboardButton("Vouch Channel", url=VOUCH_CHANNEL_URL)
