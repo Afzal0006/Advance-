@@ -132,26 +132,26 @@ def set_seller(message):
     user_tag = tag_user(message)
     args = message.text.split()
     if len(args) < 2:
-        bot.reply_to(message, f"{user_tag} ❌ Provide your wallet. Example: /seller {{BEP20_ADDRESS}}")
+        bot.reply_to(message, f"{user_tag} ❌ Provide your wallet. Example: /seller {{BEP20_ADDRESS}}", parse_mode="HTML")
         return
     seller_address = args[1]
 
     if not re.match(r"^0x[a-fA-F0-9]{40}$", seller_address):
-        bot.reply_to(message, f"{user_tag} ❌ Invalid BEP20 address!")
+        bot.reply_to(message, f"{user_tag} ❌ Invalid BEP20 address!", parse_mode="HTML")
         return
 
     deal = deals_collection.find_one({"chat_id": message.chat.id})
 
     if deal and deal.get("seller_address"):
-        bot.reply_to(message, f"{user_tag} ❌ Seller already set!")
+        bot.reply_to(message, f"{user_tag} ❌ Seller already set!", parse_mode="HTML")
         return
 
     if deal and deal.get("buyer_id") == message.from_user.id:
-        bot.reply_to(message, f"{user_tag} ❌ You are already buyer! Cannot be seller too.")
+        bot.reply_to(message, f"{user_tag} ❌ You are already buyer! Cannot be seller too.", parse_mode="HTML")
         return
 
     if deal and (deal.get("seller_address") == seller_address or deal.get("buyer_address") == seller_address):
-        bot.reply_to(message, f"{user_tag} ❌ This wallet address is already used!")
+        bot.reply_to(message, f"{user_tag} ❌ This wallet address is already used!", parse_mode="HTML")
         return
 
     deals_collection.update_one(
@@ -161,13 +161,15 @@ def set_seller(message):
     )
 
     buyer_address = deal.get("buyer_address") if deal else None
-    bot.send_message(
-        message.chat.id,
-        f"📍ESCROW-ROLE DECLARATION\n\n⚡️ SELLER {message.from_user.first_name}\n"
-        f"User ID {message.from_user.id}\n\n✅ SELLER WALLET\n{seller_address}\n\n"
-        f"{'Buyer already set: ' + buyer_address if buyer_address else 'Please set buyer using /buyer [DEPOSIT ADDRESS]'}",
-        parse_mode="HTML"
+
+    msg = (
+        f"📍ESCROW-ROLE DECLARATION\n\n"
+        f"⚡️ SELLER {user_tag}\n"
+        f"User ID {message.from_user.id}\n\n"
+        f"✅ SELLER WALLET\n{seller_address}\n\n"
+        f"{'Buyer already set: ' + buyer_address if buyer_address else 'Please set buyer using /buyer [DEPOSIT ADDRESS]'}"
     )
+    bot.send_message(message.chat.id, msg, parse_mode="HTML")
 
 # ================= /buyer COMMAND =================
 @bot.message_handler(commands=['buyer'])
@@ -175,26 +177,26 @@ def set_buyer(message):
     user_tag = tag_user(message)
     args = message.text.split()
     if len(args) < 2:
-        bot.reply_to(message, f"{user_tag} ❌ Provide buyer wallet. Example: /buyer {{BEP20_ADDRESS}}")
+        bot.reply_to(message, f"{user_tag} ❌ Provide buyer wallet. Example: /buyer {{BEP20_ADDRESS}}", parse_mode="HTML")
         return
     buyer_address = args[1]
 
     if not re.match(r"^0x[a-fA-F0-9]{40}$", buyer_address):
-        bot.reply_to(message, f"{user_tag} ❌ Invalid BEP20 address!")
+        bot.reply_to(message, f"{user_tag} ❌ Invalid BEP20 address!", parse_mode="HTML")
         return
 
     deal = deals_collection.find_one({"chat_id": message.chat.id})
 
     if deal and deal.get("buyer_address"):
-        bot.reply_to(message, f"{user_tag} ❌ Buyer already set!")
+        bot.reply_to(message, f"{user_tag} ❌ Buyer already set!", parse_mode="HTML")
         return
 
     if deal and deal.get("seller_id") == message.from_user.id:
-        bot.reply_to(message, f"{user_tag} ❌ You are already seller! Cannot be buyer too.")
+        bot.reply_to(message, f"{user_tag} ❌ You are already seller! Cannot be buyer too.", parse_mode="HTML")
         return
 
     if deal and (deal.get("seller_address") == buyer_address or deal.get("buyer_address") == buyer_address):
-        bot.reply_to(message, f"{user_tag} ❌ This wallet address is already used!")
+        bot.reply_to(message, f"{user_tag} ❌ This wallet address is already used!", parse_mode="HTML")
         return
 
     deals_collection.update_one(
@@ -204,13 +206,15 @@ def set_buyer(message):
     )
 
     seller_address = deal.get("seller_address") if deal else None
-    bot.send_message(
-        message.chat.id,
-        f"📍ESCROW-ROLE DECLARATION\n\n⚡️ BUYER {message.from_user.first_name}\n"
-        f"User ID {message.from_user.id}\n\n✅ BUYER WALLET\n{buyer_address}\n\n"
-        f"{'Seller already set: ' + seller_address if seller_address else 'Seller should set /seller [ADDRESS]'}",
-        parse_mode="HTML"
+
+    msg = (
+        f"📍ESCROW-ROLE DECLARATION\n\n"
+        f"⚡️ BUYER {user_tag}\n"
+        f"User ID {message.from_user.id}\n\n"
+        f"✅ BUYER WALLET\n{buyer_address}\n\n"
+        f"{'Seller already set: ' + seller_address if seller_address else 'Seller should set /seller [ADDRESS]'}"
     )
+    bot.send_message(message.chat.id, msg, parse_mode="HTML")
 
 # ================= GROUP WELCOME =================
 @bot.my_chat_member_handler()
