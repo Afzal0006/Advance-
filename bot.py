@@ -40,6 +40,13 @@ AVAILABLE_COMMANDS = """📌 AVAILABLE COMMANDS
 /referral - A command to check your referrals
 """
 
+CONTACT_TEXT = """☎️ CONTACT ARBITRATOR
+
+💬 Type /dispute
+
+💡 Incase you're not getting a response, you can reach out to @golgibody
+"""
+
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     user_id = message.from_user.id
@@ -52,17 +59,23 @@ def send_welcome(message):
         })
     keyboard = types.InlineKeyboardMarkup()
     keyboard.add(types.InlineKeyboardButton("Available Commands", callback_data="show_commands"))
+    keyboard.add(types.InlineKeyboardButton("☎️ Contact", callback_data="show_contact"))
     bot.send_message(message.chat.id, "Your Trustworthy Telegram Escrow Service", reply_markup=keyboard)
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
     if call.data == "show_commands":
         keyboard = types.InlineKeyboardMarkup()
-        keyboard.add(types.InlineKeyboardButton("Back", callback_data="back_start"))
+        keyboard.add(types.InlineKeyboardButton("Back 🔙", callback_data="back_start"))
         bot.edit_message_text(AVAILABLE_COMMANDS, call.message.chat.id, call.message.message_id, reply_markup=keyboard)
+    elif call.data == "show_contact":
+        keyboard = types.InlineKeyboardMarkup()
+        keyboard.add(types.InlineKeyboardButton("Back 🔙", callback_data="back_start"))
+        bot.edit_message_text(CONTACT_TEXT, call.message.chat.id, call.message.message_id, reply_markup=keyboard)
     elif call.data == "back_start":
         keyboard = types.InlineKeyboardMarkup()
         keyboard.add(types.InlineKeyboardButton("Available Commands", callback_data="show_commands"))
+        keyboard.add(types.InlineKeyboardButton("☎️ Contact", callback_data="show_contact"))
         bot.edit_message_text("Your Trustworthy Telegram Escrow Service", call.message.chat.id, call.message.message_id, reply_markup=keyboard)
 
 bot.polling()
