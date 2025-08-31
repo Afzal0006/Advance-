@@ -141,8 +141,17 @@ def set_seller(message):
         return
 
     deal = deals_collection.find_one({"chat_id": message.chat.id})
+
     if deal and deal.get("seller_address"):
-        bot.reply_to(message, f"{user_tag} ❌ Seller address already set for this group!")
+        bot.reply_to(message, f"{user_tag} ❌ Seller already set!")
+        return
+
+    if deal and deal.get("buyer_id") == message.from_user.id:
+        bot.reply_to(message, f"{user_tag} ❌ You are already buyer! Cannot be seller too.")
+        return
+
+    if deal and (deal.get("seller_address") == seller_address or deal.get("buyer_address") == seller_address):
+        bot.reply_to(message, f"{user_tag} ❌ This wallet address is already used!")
         return
 
     deals_collection.update_one(
@@ -152,7 +161,6 @@ def set_seller(message):
     )
 
     buyer_address = deal.get("buyer_address") if deal else None
-
     bot.send_message(
         message.chat.id,
         f"📍ESCROW-ROLE DECLARATION\n\n⚡️ SELLER {message.from_user.first_name}\n"
@@ -176,8 +184,17 @@ def set_buyer(message):
         return
 
     deal = deals_collection.find_one({"chat_id": message.chat.id})
+
     if deal and deal.get("buyer_address"):
-        bot.reply_to(message, f"{user_tag} ❌ Buyer address already set for this group!")
+        bot.reply_to(message, f"{user_tag} ❌ Buyer already set!")
+        return
+
+    if deal and deal.get("seller_id") == message.from_user.id:
+        bot.reply_to(message, f"{user_tag} ❌ You are already seller! Cannot be buyer too.")
+        return
+
+    if deal and (deal.get("seller_address") == buyer_address or deal.get("buyer_address") == buyer_address):
+        bot.reply_to(message, f"{user_tag} ❌ This wallet address is already used!")
         return
 
     deals_collection.update_one(
@@ -186,11 +203,12 @@ def set_buyer(message):
         upsert=True
     )
 
+    seller_address = deal.get("seller_address") if deal else None
     bot.send_message(
         message.chat.id,
         f"📍ESCROW-ROLE DECLARATION\n\n⚡️ BUYER {message.from_user.first_name}\n"
         f"User ID {message.from_user.id}\n\n✅ BUYER WALLET\n{buyer_address}\n\n"
-        "Seller should already be set using /seller [ADDRESS]",
+        f"{'Seller already set: ' + seller_address if seller_address else 'Seller should set /seller [ADDRESS]'}",
         parse_mode="HTML"
     )
 
