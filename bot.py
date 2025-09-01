@@ -115,6 +115,18 @@ def dd(message):
         reply_to_message_id=message.message_id
     )
 
+# ================= HELPER: CHECK BOTH ADDRESSES =================
+
+def check_and_prompt_token(chat_id):
+    deal = deals_collection.find_one({"chat_id": chat_id})
+    if deal and deal.get("seller_address") and deal.get("buyer_address"):
+        kb = types.InlineKeyboardMarkup()
+        kb.row(
+            types.InlineKeyboardButton("BEP20", callback_data="token_bep20"),
+            types.InlineKeyboardButton("Other", callback_data="token_other")
+        )
+        bot.send_message(chat_id, "✅ Both addresses set. Now please select token/network:", reply_markup=kb)
+
 # ================= /seller =================
 
 @bot.message_handler(commands=['seller'])
@@ -162,14 +174,8 @@ def seller(message):
            f"{'Buyer already set: ' + buyer_address if buyer_address else 'Please set buyer using /buyer [DEPOSIT ADDRESS]'}")
     bot.send_message(message.chat.id, msg, parse_mode="HTML", reply_to_message_id=message.message_id)
 
-    # ===== Prompt for token selection =====
-    bot.send_message(message.chat.id, f"{user_tag} ✅ Address set. Now please use /token to select the network.")
-    kb = types.InlineKeyboardMarkup()
-    kb.row(
-        types.InlineKeyboardButton("BEP20", callback_data="token_bep20"),
-        types.InlineKeyboardButton("Other", callback_data="token_other")
-    )
-    bot.send_message(message.chat.id, "Choose token/network:", reply_markup=kb)
+    # ✅ Prompt token only if both addresses are set
+    check_and_prompt_token(message.chat.id)
 
 # ================= /buyer =================
 
@@ -218,14 +224,8 @@ def buyer(message):
            f"{'Seller already set: ' + seller_address if seller_address else 'Seller should set /seller [ADDRESS]'}")
     bot.send_message(message.chat.id, msg, parse_mode="HTML", reply_to_message_id=message.message_id)
 
-    # ===== Prompt for token selection =====
-    bot.send_message(message.chat.id, f"{user_tag} ✅ Address set. Now please use /token to select the network.")
-    kb = types.InlineKeyboardMarkup()
-    kb.row(
-        types.InlineKeyboardButton("BEP20", callback_data="token_bep20"),
-        types.InlineKeyboardButton("Other", callback_data="token_other")
-    )
-    bot.send_message(message.chat.id, "Choose token/network:", reply_markup=kb)
+    # ✅ Prompt token only if both addresses are set
+    check_and_prompt_token(message.chat.id)
 
 # ================= CALLBACK FOR TOKEN SELECTION =================
 
