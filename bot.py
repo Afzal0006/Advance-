@@ -162,6 +162,15 @@ def seller(message):
            f"{'Buyer already set: ' + buyer_address if buyer_address else 'Please set buyer using /buyer [DEPOSIT ADDRESS]'}")
     bot.send_message(message.chat.id, msg, parse_mode="HTML", reply_to_message_id=message.message_id)
 
+    # ===== Prompt for token selection =====
+    bot.send_message(message.chat.id, f"{user_tag} ✅ Address set. Now please use /token to select the network.")
+    kb = types.InlineKeyboardMarkup()
+    kb.row(
+        types.InlineKeyboardButton("BEP20", callback_data="token_bep20"),
+        types.InlineKeyboardButton("Other", callback_data="token_other")
+    )
+    bot.send_message(message.chat.id, "Choose token/network:", reply_markup=kb)
+
 # ================= /buyer =================
 
 @bot.message_handler(commands=['buyer'])
@@ -208,6 +217,24 @@ def buyer(message):
            f"✅ BUYER WALLET\n{buyer_address}\n\n"
            f"{'Seller already set: ' + seller_address if seller_address else 'Seller should set /seller [ADDRESS]'}")
     bot.send_message(message.chat.id, msg, parse_mode="HTML", reply_to_message_id=message.message_id)
+
+    # ===== Prompt for token selection =====
+    bot.send_message(message.chat.id, f"{user_tag} ✅ Address set. Now please use /token to select the network.")
+    kb = types.InlineKeyboardMarkup()
+    kb.row(
+        types.InlineKeyboardButton("BEP20", callback_data="token_bep20"),
+        types.InlineKeyboardButton("Other", callback_data="token_other")
+    )
+    bot.send_message(message.chat.id, "Choose token/network:", reply_markup=kb)
+
+# ================= CALLBACK FOR TOKEN SELECTION =================
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("token_"))
+def token_selection(call):
+    if call.data == "token_bep20":
+        bot.send_message(call.message.chat.id, "✅ You selected BEP20 network.")
+    elif call.data == "token_other":
+        bot.send_message(call.message.chat.id, "✅ You selected Other network.")
 
 # ================= GROUP WELCOME =================
 
