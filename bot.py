@@ -120,12 +120,7 @@ def dd(message):
 def check_and_prompt_token(chat_id):
     deal = deals_collection.find_one({"chat_id": chat_id})
     if deal and deal.get("seller_address") and deal.get("buyer_address"):
-        kb = types.InlineKeyboardMarkup()
-        kb.row(
-            types.InlineKeyboardButton("BEP20", callback_data="token_bep20"),
-            types.InlineKeyboardButton("Other", callback_data="token_other")
-        )
-        bot.send_message(chat_id, "✅ Both addresses set. Now please select token/network:", reply_markup=kb)
+        bot.send_message(chat_id, "✅ Both addresses set. Please use /token to select network.")
 
 # ================= /seller =================
 
@@ -157,24 +152,14 @@ def seller(message):
                          f"{user_tag} ❌ Already buyer! Cannot be seller.",
                          parse_mode="HTML", reply_to_message_id=message.message_id)
         return
-    if deal and (deal.get("seller_address") == seller_address or deal.get("buyer_address") == seller_address):
-        bot.send_message(message.chat.id,
-                         f"{user_tag} ❌ Wallet already used!",
-                         parse_mode="HTML", reply_to_message_id=message.message_id)
-        return
 
     deals_collection.update_one(
         {"chat_id": message.chat.id},
         {"$set": {"seller_id": message.from_user.id, "seller_address": seller_address}},
         upsert=True
     )
-    buyer_address = deal.get("buyer_address") if deal else None
-    msg = (f"📍ESCROW-ROLE DECLARATION\n\n⚡️ SELLER {user_tag}\nUser ID {message.from_user.id}\n\n"
-           f"✅ SELLER WALLET\n{seller_address}\n\n"
-           f"{'Buyer already set: ' + buyer_address if buyer_address else 'Please set buyer using /buyer [DEPOSIT ADDRESS]'}")
-    bot.send_message(message.chat.id, msg, parse_mode="HTML", reply_to_message_id=message.message_id)
+    bot.send_message(message.chat.id, f"✅ Seller set: {user_tag}", parse_mode="HTML")
 
-    # ✅ Prompt token only if both addresses are set
     check_and_prompt_token(message.chat.id)
 
 # ================= /buyer =================
@@ -207,34 +192,66 @@ def buyer(message):
                          f"{user_tag} ❌ Already seller! Cannot be buyer.",
                          parse_mode="HTML", reply_to_message_id=message.message_id)
         return
-    if deal and (deal.get("seller_address") == buyer_address or deal.get("buyer_address") == buyer_address):
-        bot.send_message(message.chat.id,
-                         f"{user_tag} ❌ Wallet already used!",
-                         parse_mode="HTML", reply_to_message_id=message.message_id)
-        return
 
     deals_collection.update_one(
         {"chat_id": message.chat.id},
         {"$set": {"buyer_id": message.from_user.id, "buyer_address": buyer_address}},
         upsert=True
     )
-    seller_address = deal.get("seller_address") if deal else None
-    msg = (f"📍ESCROW-ROLE DECLARATION\n\n⚡️ BUYER {user_tag}\nUser ID {message.from_user.id}\n\n"
-           f"✅ BUYER WALLET\n{buyer_address}\n\n"
-           f"{'Seller already set: ' + seller_address if seller_address else 'Seller should set /seller [ADDRESS]'}")
-    bot.send_message(message.chat.id, msg, parse_mode="HTML", reply_to_message_id=message.message_id)
+    bot.send_message(message.chat.id, f"✅ Buyer set: {user_tag}", parse_mode="HTML")
 
-    # ✅ Prompt token only if both addresses are set
     check_and_prompt_token(message.chat.id)
 
-# ================= CALLBACK FOR TOKEN SELECTION =================
+# ================= /token =================
 
-@bot.callback_query_handler(func=lambda call: call.data.startswith("token_"))
-def token_selection(call):
-    if call.data == "token_bep20":
-        bot.send_message(call.message.chat.id, "✅ You selected BEP20 network.")
-    elif call.data == "token_other":
-        bot.send_message(call.message.chat.id, "✅ You selected Other network.")
+@bot.message_handler(commands=['token'])
+def token(message):
+    deal = deals_collection.find_one({"chat_id": message.chat.id})
+    user_tag = tag_user(message)
+
+    if not deal or not deal.get("seller_address") or not deal.get("buyer_address"):
+        bot.send_message(message.chat.id, "❌ Both buyer and seller must be set first.")
+        return
+
+    role = ""
+    if deal.get("seller_id") == message.from_user.id:
+        role = "SELLER"
+    elif deal.get("buyer_id") == message.from_user.id:
+        role = "BUYER"
+    else:
+        bot.send_message(message.chat.id, "❌ You are neither buyer nor seller in this deal.")
+        return
+
+    kb = types.InlineKeyboardMarkup()
+    kb.add(types.InlineKeyboardButton("BEP20", callback_data=f"token_bep20:{message.from_user.id}"))
+    bot.send_message(
+        message.chat.id,
+        f"📍ESCROW DECLARATION\n\n⚡️ {role} {user_tag}",
+        reply_markup=kb,
+        parse_mode="HTML"
+    )
+
+# ================= CALLBACK HANDLER =================
+
+@bot.callback_query_handler(func=lambda call: True)
+def callbacks(call):
+    if call.data.startswith("token_bep20:"):
+        user_id = call.data.split(":")[1]
+        kb = types.InlineKeyboardMarkup()
+        kb.row(
+            types.InlineKeyboardButton("✅ Accept", callback_data=f"accept:{user_id}"),
+            types.InlineKeyboardButton("❌ Reject", callback_data=f"reject:{user_id}")
+        )
+        bot.edit_message_text(
+            f"📍Token: BEP20\nDo you accept or reject?",
+            call.message.chat.id,
+            call.message.message_id,
+            reply_markup=kb
+        )
+    elif call.data.startswith("accept:"):
+        bot.edit_message_text("✅ Token accepted ✅", call.message.chat.id, call.message.message_id)
+    elif call.data.startswith("reject:"):
+        bot.edit_message_text("❌ Token rejected ❌", call.message.chat.id, call.message.message_id)
 
 # ================= GROUP WELCOME =================
 
@@ -244,10 +261,10 @@ def new_member(message):
         bot.send_message(message.chat.id,
                          f"👋 Welcome {user.first_name}!\n\n📍 Please start with /dd to fill Deal Info Form.")
 
-# ================= BUTTON CALLBACKS =================
+# ================= START MENU CALLBACKS =================
 
 @bot.callback_query_handler(func=lambda call: True)
-def callbacks(call):
+def menu_callbacks(call):
     if call.data == "show_commands":
         kb = types.InlineKeyboardMarkup()
         kb.add(types.InlineKeyboardButton("Back 🔙", callback_data="back_start"))
