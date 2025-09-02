@@ -1,388 +1,328 @@
-"""
-Escrow bot (telebot) - trade ids as #1, #2, #3 ...
-Requirements: pyTelegramBotAPI
-
-Environment/Secrets required:
-- BOT_TOKEN         (your bot token from BotFather)
-- OWNER_IDS         (comma-separated owner IDs, e.g. "12345678,87654321")
-- LOG_CHANNEL       (optional: @channelname or chat id for logs)
-
-Save this file as: escrow_bot.py
-Run: python escrow_bot.py
-"""
-
-import os
 import re
-import json
-from datetime import datetime, timezone
-import telebot
-from telebot.types import Message
+import random
+from telegram import Update
+from telegram.ext import Application, CommandHandler, ContextTypes
+from pymongo import MongoClient
 
-# ---------- Config ----------
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-OWNER_IDS_ENV = os.getenv("OWNER_IDS", "")  # e.g. "12345678,98765432"
-LOG_CHANNEL = os.getenv("LOG_CHANNEL")  # optional: channel/user to send logs
-DATA_FILE = "data.json"
-FEE_PCT = 3.0  # default fee percent when +fee used
+# ==== CONFIG ====
+BOT_TOKEN = "8414351117:AAEDEkc1VblJ8NU8Umle1gby1KyY94Gd1x4"
+MONGO_URI = "mongodb+srv://afzal99550:afzal99550@cluster0.aqmbh9q.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+LOG_CHANNEL_ID = -1002161414780
 
-if not BOT_TOKEN:
-    raise SystemExit("BOT_TOKEN not set. Add it to environment/secrets.")
+# Multiple owner IDs
+OWNER_IDS = [6998916494]  # Add as many IDs as you want
 
-# parse owner ids
-try:
-    OWNERS = [int(x.strip()) for x in OWNER_IDS_ENV.split(",") if x.strip()]
-except:
-    OWNERS = []
+# ==== MONGO CONNECT ====
+client = MongoClient(MONGO_URI)
+db = client["escrow_bot"]
+groups_col = db["groups"]
+global_col = db["global"]
+admins_col = db["admins"]
 
-bot = telebot.TeleBot(BOT_TOKEN, parse_mode=None)
+# Ensure global doc exists
+if not global_col.find_one({"_id": "stats"}):
+    global_col.insert_one({
+        "_id": "stats",
+        "total_deals": 0,
+        "total_volume": 0,
+        "total_fee": 0.0,
+        "escrowers": {},
+        "users": {}
+    })
 
-# ---------- Persistence ----------
-def load_data():
-    if not os.path.exists(DATA_FILE):
-        return {"trades": {}, "admins": [], "next_id": 1}
-    with open(DATA_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+# ==== HELPERS ====
+async def is_admin(update: Update) -> bool:
+    user_id = update.effective_user.id
+    if user_id in OWNER_IDS:
+        return True
+    return admins_col.find_one({"user_id": user_id}) is not None
 
-def save_data(data):
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+def init_group(chat_id: str):
+    if not groups_col.find_one({"_id": chat_id}):
+        groups_col.insert_one({
+            "_id": chat_id,
+            "deals": {},
+            "total_deals": 0,
+            "total_volume": 0,
+            "total_fee": 0.0,
+            "escrowers": {}
+        })
 
-data = load_data()
-trades = data.get("trades", {})        # keys are strings of numbers: "1","2",...
-admins = set(data.get("admins", []))
-next_id = int(data.get("next_id", 1))
+def update_escrower_stats(group_id: str, escrower: str, amount: float):
+    g = groups_col.find_one({"_id": group_id})
+    g["total_deals"] += 1
+    g["total_volume"] += amount
+    g["escrowers"][escrower] = g["escrowers"].get(escrower, 0) + amount
+    groups_col.update_one({"_id": group_id}, {"$set": g})
 
-def persist():
-    data["trades"] = trades
-    data["admins"] = list(admins)
-    data["next_id"] = next_id
-    save_data(data)
+    global_data = global_col.find_one({"_id": "stats"})
+    global_data["total_deals"] += 1
+    global_data["total_volume"] += amount
+    global_data["escrowers"][escrower] = global_data["escrowers"].get(escrower, 0) + amount
+    global_col.update_one({"_id": "stats"}, {"$set": global_data})
 
-# ---------- Utilities ----------
-def gen_trade_id():
-    global next_id
-    tid = next_id
-    next_id += 1
-    persist()
-    return tid  # integer
+# ==== USER STATS ====
+def update_user_stats(username: str, amount: float):
+    global_data = global_col.find_one({"_id": "stats"})
+    if "users" not in global_data:
+        global_data["users"] = {}
 
-def now_iso():
-    return datetime.now(timezone.utc).astimezone().isoformat(timespec='seconds')
+    if username not in global_data["users"]:
+        global_data["users"][username] = {"deals": 0, "volume": 0}
 
-def parse_deal_form(text):
-    buyer = re.search(r"BUYER\s*[:\-]\s*(?P<b>@[A-Za-z0-9_]+|\w+)", text, re.IGNORECASE)
-    seller = re.search(r"SELLER\s*[:\-]\s*(?P<s>@[A-Za-z0-9_]+|\w+)", text, re.IGNORECASE)
-    amount = re.search(r"DEAL\s*AMOUNT\s*[:\-]\s*(?P<a>[\d\.,]+)", text, re.IGNORECASE)
-    info = re.search(r"DEAL\s*INFO\s*[:\-]\s*(?P<i>.+)", text, re.IGNORECASE)
-    ttd = re.search(r"TIME\s*TO\s*DEAL\s*[:\-]\s*(?P<t>.+)", text, re.IGNORECASE)
+    global_data["users"][username]["deals"] += 1
+    global_data["users"][username]["volume"] += amount
 
-    res = {}
-    res['buyer'] = buyer.group('b').strip() if buyer else None
-    res['seller'] = seller.group('s').strip() if seller else None
-    if amount:
-        a = amount.group('a').replace(',', '').strip()
-        try:
-            res['amount'] = float(a)
-        except:
-            res['amount'] = None
-    else:
-        res['amount'] = None
-    res['info'] = info.group('i').strip() if info else ""
-    res['time_to_deal'] = ttd.group('t').strip() if ttd else ""
-    return res
+    global_col.update_one({"_id": "stats"}, {"$set": global_data})
 
-def is_owner(user_id):
-    return user_id in OWNERS
-
-def is_admin(user_id):
-    return user_id in admins or is_owner(user_id)
-
-# ---------- Commands ----------
-@bot.message_handler(commands=['start'])
-def cmd_start(m: Message):
-    txt = (
-        "👋 Welcome to Escrow Bot!\n\n"
-        "• Reply to a deal form and Admin uses /add or /add+fee to register payment.\n"
-        "• Admin later uses /done, /done+fee, /refund, /refund+fee.\n"
-        "• /mystats → See all your deals (as buyer or seller).\n"
-        "• /stats → Group stats.\n"
-        "• /gstats → Global stats per admin.\n"
-        "Owner commands: /addadmin <user_id>, /removeadmin <user_id>\n"
+# ==== COMMANDS ====
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = (
+        "✨ <b>Welcome to Escrower Bot!</b> ✨\n\n"
+        "• /add <code>amount</code> – Add a new deal\n"
+        "• /complete <code>amount</code> – Complete a deal\n"
+        "• /stats – Group stats\n"
+        "• /gstats – Global stats (Admin only)\n"
+        "• /mystats – View your stats\n"
+        "• /addadmin <code>user_id</code> – Owner only\n"
+        "• /removeadmin <code>user_id</code> – Owner only\n"
+        "• /adminlist – Show all admins"
     )
-    bot.reply_to(m, txt)
+    await update.message.reply_text(msg, parse_mode="HTML")
 
-@bot.message_handler(commands=['addadmin'])
-def cmd_addadmin(m: Message):
-    user_id = m.from_user.id
-    if not is_owner(user_id):
-        bot.reply_to(m, "⛔ Only Owners can add admins.")
-        return
-    args = m.text.split()
-    if len(args) < 2:
-        bot.reply_to(m, "Usage: /addadmin <user_id>")
+async def add_deal(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await is_admin(update):
         return
     try:
-        uid = int(args[1])
+        await update.message.delete()
     except:
-        bot.reply_to(m, "Invalid user id.")
-        return
-    admins.add(uid)
-    persist()
-    bot.reply_to(m, f"✅ Added admin: {uid}")
-
-@bot.message_handler(commands=['removeadmin'])
-def cmd_removeadmin(m: Message):
-    user_id = m.from_user.id
-    if not is_owner(user_id):
-        bot.reply_to(m, "⛔ Only Owners can remove admins.")
-        return
-    args = m.text.split()
-    if len(args) < 2:
-        bot.reply_to(m, "Usage: /removeadmin <user_id>")
-        return
-    try:
-        uid = int(args[1])
-    except:
-        bot.reply_to(m, "Invalid user id.")
-        return
-    if uid in admins:
-        admins.remove(uid)
-        persist()
-        bot.reply_to(m, f"❌ Removed admin: {uid}")
-    else:
-        bot.reply_to(m, "⚠️ This user is not an admin.")
-
-@bot.message_handler(commands=['add', 'add+fee'])
-def cmd_add(m: Message):
-    user_id = m.from_user.id
-    if not is_admin(user_id):
-        bot.reply_to(m, "⛔ Only Admins can add deal payments.")
-        return
-    if not m.reply_to_message or not m.reply_to_message.text:
-        bot.reply_to(m, "⚠️ Please reply to the deal form message with /add or /add+fee")
-        return
-
-    form = parse_deal_form(m.reply_to_message.text)
-    if not form['buyer'] or not form['seller'] or form['amount'] is None:
-        bot.reply_to(m, "❌ Could not extract Buyer/Seller/Amount from the form. Make sure it's formatted.")
-        return
-
-    use_fee = m.text.strip().lower().endswith('+fee')
-    fee_amt = round(form['amount'] * (FEE_PCT/100.0), 2) if use_fee else 0.0
-    total = round(form['amount'] + fee_amt, 2)
-
-    tid = gen_trade_id()                # integer like 1,2,3
-    trade = {
-        "id": tid,
-        "buyer": form['buyer'],
-        "seller": form['seller'],
-        "amount": form['amount'],
-        "fee": fee_amt,
-        "total": total,
-        "status": "open",
-        "admin": user_id,
-        "created_at": now_iso(),
-        "updated_at": now_iso(),
-        "chat_id": m.chat.id,
-        "origin_message_id": m.reply_to_message.message_id
-    }
-    trades[str(tid)] = trade            # store key as string
-    persist()
-
-    text = (
-        f"✅ PAYMENT RECEIVED\n"
-        f"────────────────\n"
-        f"👤 Buyer  : {trade['buyer']}\n"
-        f"👤 Seller : {trade['seller']}\n"
-        f"💸 Received : {trade['amount']}\n"
-        f"🆔 Trade ID : #{trade['id']}\n"
-        f"💰 Fee     : {trade['fee']}\n"
-        f"🧾 TOTAL   : {trade['total']}\n"
-        f"CONTINUE DEAL ❤️\n"
-        f"────────────────"
-    )
-    bot.send_message(m.chat.id, text)
-
-    if LOG_CHANNEL:
-        try:
-            bot.send_message(LOG_CHANNEL, f"📜 Payment Received (Log)\n{('-'*24)}\n{ text }")
-        except Exception:
-            pass
-
-@bot.message_handler(commands=['done', 'done+fee'])
-def cmd_done(m: Message):
-    user_id = m.from_user.id
-    if not is_admin(user_id):
-        bot.reply_to(m, "⛔ Only Admins can complete deals.")
-        return
-    if not m.reply_to_message:
-        bot.reply_to(m, "⚠️ Reply to the PAYMENT RECEIVED message (the bot's message with the Trade ID).")
-        return
-
-    text = m.reply_to_message.text or ""
-    match = re.search(r"#(\d+)", text)
-    if not match:
-        bot.reply_to(m, "❌ Could not find Trade ID (#number) in the replied message.")
-        return
-    tid_str = match.group(1)           # numeric string
-    if tid_str not in trades:
-        bot.reply_to(m, "❌ Trade not found.")
-        return
-
-    trade = trades[tid_str]
-    use_fee = m.text.strip().lower().endswith('+fee')
-    if use_fee and trade.get('fee', 0) == 0:
-        trade['fee'] = round(trade['amount'] * (FEE_PCT/100.0), 2)
-        trade['total'] = round(trade['amount'] + trade['fee'], 2)
-    trade['status'] = 'completed'
-    trade['updated_at'] = now_iso()
-    trade['completed_by'] = user_id
-    persist()
-
-    out = (
-        f"✅ DEAL COMPLETED\n"
-        f"────────────────\n"
-        f"👤 Buyer  : {trade['buyer']}\n"
-        f"👤 Seller : {trade['seller']}\n"
-        f"💰 Amount : {trade['amount']}\n"
-        f"🆔 Trade ID : #{trade['id']}\n"
-        f"💰 Fee     : {trade['fee']}\n"
-        f"🧾 TOTAL   : {trade['total']}\n"
-        f"────────────────\n"
-        f"🛡️ Escrowed by @{m.from_user.username or m.from_user.id}"
-    )
-    bot.send_message(m.chat.id, out)
-    if LOG_CHANNEL:
-        try:
-            bot.send_message(LOG_CHANNEL, f"📜 Deal Completed (Log)\n{('-'*24)}\n{ out }")
-        except:
-            pass
-
-@bot.message_handler(commands=['refund', 'refund+fee'])
-def cmd_refund(m: Message):
-    user_id = m.from_user.id
-    if not is_admin(user_id):
-        bot.reply_to(m, "⛔ Only Admins can refund deals.")
-        return
-    if not m.reply_to_message:
-        bot.reply_to(m, "⚠️ Reply to the PAYMENT/TRADE message with /refund")
-        return
-    text = m.reply_to_message.text or ""
-    match = re.search(r"#(\d+)", text)
-    if not match:
-        bot.reply_to(m, "❌ Could not find Trade ID (#number) in the replied message.")
-        return
-    tid_str = match.group(1)
-    if tid_str not in trades:
-        bot.reply_to(m, "❌ Trade not found.")
-        return
-
-    trade = trades[tid_str]
-    use_fee = m.text.strip().lower().endswith('+fee')
-    if use_fee and trade.get('fee', 0) == 0:
-        trade['fee'] = round(trade['amount'] * (FEE_PCT/100.0), 2)
-        trade['total'] = round(trade['amount'] + trade['fee'], 2)
-
-    trade['status'] = 'refunded'
-    trade['updated_at'] = now_iso()
-    trade['refunded_by'] = user_id
-    persist()
-
-    out = (
-        f"❌ REFUND COMPLETED\n"
-        f"────────────────\n"
-        f"👤 Buyer  : {trade['buyer']}\n"
-        f"👤 Seller : {trade['seller']}\n"
-        f"💰 Refund : {trade['amount']}\n"
-        f"🆔 Trade ID : #{trade['id']}\n"
-        f"💰 Fee     : {trade['fee']}\n"
-        f"────────────────\n"
-        f"🛡️ Escrowed by @{m.from_user.username or m.from_user.id}"
-    )
-    bot.send_message(m.chat.id, out)
-    if LOG_CHANNEL:
-        try:
-            bot.send_message(LOG_CHANNEL, f"📜 Refund Completed (Log)\n{('-'*24)}\n{ out }")
-        except:
-            pass
-
-@bot.message_handler(commands=['stats'])
-def cmd_stats(m: Message):
-    chat_id = m.chat.id
-    total = completed = refunded = 0
-    volume = 0.0
-    for t in trades.values():
-        if t.get('chat_id') == chat_id:
-            total += 1
-            volume += float(t.get('amount',0) or 0)
-            if t.get('status') == 'completed': completed += 1
-            if t.get('status') == 'refunded': refunded += 1
-    txt = (
-        f"📊 Group Stats\n"
-        f"Total Trades: {total}\n"
-        f"Completed: {completed}\n"
-        f"Refunded: {refunded}\n"
-        f"Total Volume: {volume}"
-    )
-    bot.reply_to(m, txt)
-
-@bot.message_handler(commands=['gstats'])
-def cmd_gstats(m: Message):
-    agg = {}
-    for t in trades.values():
-        adm = str(t.get('admin','unknown'))
-        if adm not in agg:
-            agg[adm] = {"hold":0.0, "completed":0.0, "refunded":0.0, "count":0}
-        agg[adm]["count"] += 1
-        if t.get('status') == 'open':
-            agg[adm]["hold"] += float(t.get('amount',0) or 0)
-        if t.get('status') == 'completed':
-            agg[adm]["completed"] += float(t.get('amount',0) or 0)
-        if t.get('status') == 'refunded':
-            agg[adm]["refunded'] += float(t.get('amount',0) or 0)
-    lines = ["🌐 Global Stats (All time)"]
-    for adm, v in agg.items():
-        lines.append(f"\nEscrowed by : {adm}")
-        lines.append(f"Hold        : {v['hold']}")
-        lines.append(f"Completed   : {v['completed']}")
-        lines.append(f"Refunded    : {v['refunded']}")
-        lines.append(f"Total Trades: {v['count']}")
-    bot.reply_to(m, "\n".join(lines))
-
-@bot.message_handler(commands=['mystats'])
-def cmd_mystats(m: Message):
-    user = m.from_user
-    uname = "@" + user.username if user.username else None
-    uid = user.id
-    matches = []
-    for t in trades.values():
-        b = (t.get('buyer') or "").lower()
-        s = (t.get('seller') or "").lower()
-        if (uname and uname.lower() in b) or (uname and uname.lower() in s):
-            matches.append(t); continue
-        if str(uid) in b or str(uid) in s:
-            matches.append(t); continue
-    if not matches:
-        bot.reply_to(m, "ℹ️ Koi deals nahi mile aapke liye.")
-        return
-    parts = [f"📋 {len(matches)} deals found for {user.first_name}:"]
-    for t in sorted(matches, key=lambda x: x.get('created_at','')):
-        parts.append(
-            f"\n🆔 #{t['id']}\nBuyer: {t['buyer']}\nSeller: {t['seller']}\nAmount: {t['amount']}\nStatus: {t['status']}\nCreated: {t['created_at']}\nUpdated: {t['updated_at']}"
-        )
-    bot.reply_to(m, "\n".join(parts))
-
-@bot.message_handler(func=lambda m: True, content_types=['text'])
-def fallback(m: Message):
-    if m.text and m.text.startswith('/'):
-        bot.reply_to(m, "Unknown command. Use /start to see available commands.")
-    else:
         pass
+    if not update.message.reply_to_message:
+        return await update.message.reply_text("❌ Reply to the DEAL INFO message!")
 
-# ---------- Start polling ----------
-if __name__ == "__main__":
-    print("Bot starting...")
+    if not context.args or not context.args[0].replace(".", "", 1).isdigit():
+        return await update.message.reply_text("❌ Please provide amount like /add 50")
+
+    amount = float(context.args[0])
+
+    original_text = update.message.reply_to_message.text
+    chat_id = str(update.effective_chat.id)
+    reply_id = str(update.message.reply_to_message.message_id)
+    init_group(chat_id)
+
+    buyer_match = re.search(r"BUYER\s*:\s*(@\w+)", original_text, re.IGNORECASE)
+    seller_match = re.search(r"SELLER\s*:\s*(@\w+)", original_text, re.IGNORECASE)
+
+    buyer = buyer_match.group(1) if buyer_match else "Unknown"
+    seller = seller_match.group(1) if seller_match else "Unknown"
+
+    g = groups_col.find_one({"_id": chat_id})
+    deals = g["deals"]
+    trade_id = f"TID{random.randint(100000, 999999)}"
+    deals[reply_id] = {
+        "trade_id": trade_id,
+        "added_amount": amount,
+        "completed": False
+    }
+
+    g["deals"] = deals
+    groups_col.update_one({"_id": chat_id}, {"$set": g})
+
+    escrower = f"@{update.effective_user.username}" if update.effective_user.username else update.effective_user.full_name
+    update_escrower_stats(chat_id, escrower, amount)
+
+    # ✅ Update stats for buyer, seller, escrower
+    update_user_stats(buyer, amount)
+    update_user_stats(seller, amount)
+    update_user_stats(escrower, amount)
+
+    msg = (
+        f"✅ <b>Amount Received!</b>\n"
+        "────────────────\n"
+        f"👤 Buyer : {buyer}\n"
+        f"👤 Seller : {seller}\n"
+        f"💰 Amount : ₹{amount}\n"
+        f"🆔 Trade ID : #{trade_id}\n"
+        "────────────────\n"
+        f"🛡️ Escrowed by {escrower}"
+    )
+    await update.effective_chat.send_message(msg, reply_to_message_id=update.message.reply_to_message.message_id, parse_mode="HTML")
+
+async def complete_deal(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await is_admin(update):
+        return
     try:
-        bot.infinity_polling(timeout=60, long_polling_timeout = 60)
-    except Exception as e:
-        print("Polling error:", e)
+        await update.message.delete()
+    except:
+        pass
+    if not update.message.reply_to_message:
+        return await update.message.reply_text("❌ Reply to the DEAL INFO message!")
+
+    if not context.args or not context.args[0].replace(".", "", 1).isdigit():
+        return await update.message.reply_text("❌ Please provide amount like /complete 50")
+
+    released = float(context.args[0])
+
+    chat_id = str(update.effective_chat.id)
+    reply_id = str(update.message.reply_to_message.message_id)
+    g = groups_col.find_one({"_id": chat_id})
+    deal_info = g["deals"].get(reply_id)
+
+    if not deal_info:
+        return await update.message.reply_text("❌ Deal not found!")
+    if deal_info["completed"]:
+        return await update.message.reply_text("⚠️ Already completed!")
+
+    deal_info["completed"] = True
+    g["deals"][reply_id] = deal_info
+
+    # ✅ Calculate fee
+    added_amount = deal_info["added_amount"]
+    fee = added_amount - released if added_amount > released else 0
+
+    g["total_fee"] += fee
+    groups_col.update_one({"_id": chat_id}, {"$set": g})
+
+    global_data = global_col.find_one({"_id": "stats"})
+    global_data["total_fee"] += fee
+    global_col.update_one({"_id": "stats"}, {"$set": global_data})
+
+    buyer_match = re.search(r"BUYER\s*:\s*(@\w+)", update.message.reply_to_message.text, re.IGNORECASE)
+    seller_match = re.search(r"SELLER\s*:\s*(@\w+)", update.message.reply_to_message.text, re.IGNORECASE)
+    buyer = buyer_match.group(1) if buyer_match else "Unknown"
+    seller = seller_match.group(1) if seller_match else "Unknown"
+
+    escrower = f"@{update.effective_user.username}" if update.effective_user.username else update.effective_user.full_name
+    trade_id = deal_info["trade_id"]
+
+    msg = (
+        f"✅ <b>Deal Completed!</b>\n"
+        "────────────────\n"
+        f"👤 Buyer  : {buyer}\n"
+        f"👤 Seller  : {seller}\n"
+        f"💸 Released : ₹{released}\n"
+        f"🆔 Trade ID : #{trade_id}\n"
+        f"💰 Fee     : ₹{fee}\n"
+        "────────────────\n"
+        f"🛡️ Escrowed by {escrower}"
+    )
+    await update.effective_chat.send_message(msg, reply_to_message_id=update.message.reply_to_message.message_id, parse_mode="HTML")
+
+    log_msg = (
+        "📜 <b>Deal Completed (Log)</b>\n"
+        "────────────────\n"
+        f"👤 Buyer   : {buyer}\n"
+        f"👤 Seller  : {seller}\n"
+        f"💸 Released: ₹{released}\n"
+        f"🆔 Trade ID: #{trade_id}\n"
+        f"💰 Fee     : ₹{fee}\n"
+        f"🛡️ Escrowed by {escrower}\n"
+        f"📌 Group: {update.effective_chat.title} ({update.effective_chat.id})"
+    )
+    await context.bot.send_message(LOG_CHANNEL_ID, log_msg, parse_mode="HTML")
+
+async def group_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = str(update.effective_chat.id)
+    init_group(chat_id)
+    g = groups_col.find_one({"_id": chat_id})
+    escrowers_text = "\n".join([f"{name} = ₹{amt}" for name, amt in g["escrowers"].items()]) or "No deals yet"
+    msg = (
+        f"📊 Group Stats\n\n"
+        f"{escrowers_text}\n\n"
+        f"🔹 Total Deals: {g['total_deals']}\n"
+        f"💰 Total Volume: ₹{g['total_volume']}\n"
+        f"💸 Total Fee: ₹{g['total_fee']}"
+    )
+    await update.message.reply_text(msg)
+
+async def global_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await is_admin(update):
+        return
+    g = global_col.find_one({"_id": "stats"})
+    escrowers_text = "\n".join([f"{name} = ₹{amt}" for name, amt in g["escrowers"].items()]) or "No deals yet"
+    msg = (
+        f"🌍 Global Stats\n\n"
+        f"{escrowers_text}\n\n"
+        f"🔹 Total Deals: {g['total_deals']}\n"
+        f"💰 Total Volume: ₹{g['total_volume']}\n"
+        f"💸 Total Fee: ₹{g['total_fee']}"
+    )
+    await update.message.reply_text(msg)
+
+# ==== MY STATS ====
+async def my_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    username = f"@{user.username}" if user.username else user.full_name
+
+    g = global_col.find_one({"_id": "stats"})
+    users = g.get("users", {})
+
+    if username not in users:
+        return await update.message.reply_text("❌ No stats found for you yet.")
+
+    stats = users[username]
+    msg = (
+        f"📊 <b>My Stats</b>\n\n"
+        f"👤 User: {username}\n"
+        f"🔹 Total Deals: {stats['deals']}\n"
+        f"💰 Total Volume: ₹{stats['volume']}"
+    )
+    await update.message.reply_text(msg, parse_mode="HTML")
+
+# ==== ADMIN COMMANDS ====
+async def add_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if user_id not in OWNER_IDS:
+        return await update.message.reply_text("❌ Only owners can add admins!")
+
+    if not context.args or not context.args[0].isdigit():
+        return await update.message.reply_text("❌ Provide a valid user_id, e.g. /addadmin 123456789")
+
+    new_admin_id = int(context.args[0])
+    if admins_col.find_one({"user_id": new_admin_id}):
+        return await update.message.reply_text("⚠️ Already an admin!")
+
+    admins_col.insert_one({"user_id": new_admin_id})
+    await update.message.reply_text(f"✅ Added as admin: <code>{new_admin_id}</code>", parse_mode="HTML")
+
+async def remove_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if user_id not in OWNER_IDS:
+        return await update.message.reply_text("❌ Only owners can remove admins!")
+
+    if not context.args or not context.args[0].isdigit():
+        return await update.message.reply_text("❌ Provide a valid user_id, e.g. /removeadmin 123456789")
+
+    remove_id = int(context.args[0])
+    if not admins_col.find_one({"user_id": remove_id}):
+        return await update.message.reply_text("⚠️ This user is not an admin!")
+
+    admins_col.delete_one({"user_id": remove_id})
+    await update.message.reply_text(f"✅ Removed admin: <code>{remove_id}</code>", parse_mode="HTML")
+
+async def admin_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await is_admin(update):
+        return
+    admins = list(admins_col.find({}, {"_id": 0, "user_id": 1}))
+    owners = [f"⭐ Owner: <code>{oid}</code>" for oid in OWNER_IDS]
+    admins_text = "\n".join([f"👮 Admin: <code>{a['user_id']}</code>" for a in admins]) or "No extra admins added."
+    msg = "📋 <b>Admin List</b>\n\n" + "\n".join(owners) + "\n" + admins_text
+    await update.message.reply_text(msg, parse_mode="HTML")
+
+# ==== MAIN ====
+def main():
+    app = Application.builder().token(BOT_TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("add", add_deal))
+    app.add_handler(CommandHandler("complete", complete_deal))
+    app.add_handler(CommandHandler("stats", group_stats))
+    app.add_handler(CommandHandler("gstats", global_stats))
+    app.add_handler(CommandHandler("mystats", my_stats))
+    app.add_handler(CommandHandler("addadmin", add_admin))
+    app.add_handler(CommandHandler("removeadmin", remove_admin))
+    app.add_handler(CommandHandler("adminlist", admin_list))
+    print("Bot started... ✅")
+    app.run_polling()
+
+if __name__ == "__main__":
+    main()
