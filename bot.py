@@ -66,6 +66,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "✨ <b>Welcome to Escrower Bot!</b> ✨\n\n"
         "• /add <code>amount</code> – Add a new deal\n"
         "• /complete <code>amount</code> – Complete a deal\n"
+        "• /status – Check deal status\n"
         "• /stats – Group stats\n"
         "• /gstats – Global stats (Admin only)\n"
         "• /mystats – Your buyer/seller stats (Global)\n"
@@ -201,6 +202,32 @@ async def complete_deal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await context.bot.send_message(LOG_CHANNEL_ID, log_msg, parse_mode="HTML")
 
+# ==== NEW: Status Command ====
+async def deal_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message.reply_to_message:
+        return await update.message.reply_text("❌ Reply to the DEAL INFO message to check status!")
+
+    chat_id = str(update.effective_chat.id)
+    reply_id = str(update.message.reply_to_message.message_id)
+
+    g = groups_col.find_one({"_id": chat_id})
+    if not g or reply_id not in g.get("deals", {}):
+        return await update.message.reply_text("⚠️ No deal found for this message!")
+
+    deal = g["deals"][reply_id]
+    status = "✅ Completed" if deal.get("completed") else "⌛ Pending"
+
+    msg = (
+        f"📌 <b>Deal Status</b>\n"
+        f"🆔 Trade ID: #{deal.get('trade_id')}\n"
+        f"👤 Buyer: {deal.get('buyer', 'Unknown')}\n"
+        f"👤 Seller: {deal.get('seller', 'Unknown')}\n"
+        f"💰 Amount: ₹{deal.get('added_amount', 0)}\n"
+        f"📊 Status: {status}"
+    )
+    await update.message.reply_text(msg, parse_mode="HTML")
+
+# ==== STATS COMMANDS ====
 async def group_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = str(update.effective_chat.id)
     init_group(chat_id)
@@ -237,7 +264,6 @@ async def my_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     total_deals = 0
     total_volume = 0
 
-    # ✅ Check across ALL groups
     for g in groups_col.find({}):
         for deal in g.get("deals", {}).values():
             if not deal:
@@ -262,7 +288,7 @@ async def my_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(msg, parse_mode="HTML")
 
-# ==== NEW: All Stats Command (Admin only + Top 5) ====
+# ==== NEW: All Stats Command ====
 async def all_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin(update):
         return await update.message.reply_text("❌ Only admins can use this command!")
@@ -360,15 +386,6 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("add", add_deal))
     app.add_handler(CommandHandler("complete", complete_deal))
+    app.add_handler(CommandHandler("status", deal_status))   # ✅ New
     app.add_handler(CommandHandler("stats", group_stats))
-    app.add_handler(CommandHandler("gstats", global_stats))
-    app.add_handler(CommandHandler("mystats", my_stats))
-    app.add_handler(CommandHandler("allstats", all_stats))   # ✅ New
-    app.add_handler(CommandHandler("addadmin", add_admin))
-    app.add_handler(CommandHandler("removeadmin", remove_admin))
-    app.add_handler(CommandHandler("adminlist", admin_list))
-    print("Bot started... ✅")
-    app.run_polling()
-
-if __name__ == "__main__":
-    main()
+    app.add_handler(CommandHandler("g
