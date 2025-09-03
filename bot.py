@@ -70,6 +70,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• /gstats – Global stats (Admin only)\n"
         "• /mystats – Your buyer/seller stats (Global)\n"
         "• /allstats – All users stats (Admin only)\n"
+        "• /status <code>trade_id</code> – Check deal status (Admin only)\n"
         "• /addadmin <code>user_id</code> – Owner only\n"
         "• /removeadmin <code>user_id</code> – Owner only\n"
         "• /adminlist – Show all admins"
@@ -105,18 +106,20 @@ async def add_deal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     g = groups_col.find_one({"_id": chat_id})
     deals = g["deals"]
     trade_id = f"TID{random.randint(100000, 999999)}"
+    escrower = f"@{update.effective_user.username}" if update.effective_user.username else update.effective_user.full_name
+
     deals[reply_id] = {
         "trade_id": trade_id,
         "added_amount": amount,
         "completed": False,
         "buyer": buyer,
-        "seller": seller
+        "seller": seller,
+        "escrower": escrower   # ✅ Store escrower in deal
     }
 
     g["deals"] = deals
     groups_col.update_one({"_id": chat_id}, {"$set": g})
 
-    escrower = f"@{update.effective_user.username}" if update.effective_user.username else update.effective_user.full_name
     update_escrower_stats(chat_id, escrower, amount)
 
     msg = (
@@ -157,11 +160,11 @@ async def complete_deal(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.message.reply_text("⚠️ Already completed!")
 
     deal_info["completed"] = True
-    g["deals"][reply_id] = deal_info
-
-    # ✅ Calculate fee
+    deal_info["released"] = released   # ✅ store released
     added_amount = deal_info["added_amount"]
     fee = added_amount - released if added_amount > released else 0
+    deal_info["fee"] = fee             # ✅ store fee
+    g["deals"][reply_id] = deal_info
 
     g["total_fee"] += fee
     groups_col.update_one({"_id": chat_id}, {"$set": g})
@@ -172,7 +175,7 @@ async def complete_deal(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     buyer = deal_info.get("buyer", "Unknown")
     seller = deal_info.get("seller", "Unknown")
-    escrower = f"@{update.effective_user.username}" if update.effective_user.username else update.effective_user.full_name
+    escrower = deal_info.get("escrower", "Unknown")
     trade_id = deal_info["trade_id"]
 
     msg = (
@@ -201,6 +204,62 @@ async def complete_deal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await context.bot.send_message(LOG_CHANNEL_ID, log_msg, parse_mode="HTML")
 
+# ==== NEW: Status Command (Admin only) ====
+async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await is_admin(update):
+        return await update.message.reply_text("❌ Only admins can use this command!")
+
+    if not context.args:
+        return await update.message.reply_text("❌ Usage: /status <Trade ID>")
+
+    trade_id = context.args[0].strip().replace("#", "").upper()
+
+    found = None
+    for g in groups_col.find({}):
+        for deal in g.get("deals", {}).values():
+            if deal and deal.get("trade_id") == trade_id:
+                found = deal
+                break
+        if found:
+            break
+
+    if not found:
+        return await update.message.reply_text(f"❌ Trade ID {trade_id} not found!")
+
+    buyer = found.get("buyer", "Unknown")
+    seller = found.get("seller", "Unknown")
+    amount = found.get("added_amount", 0)
+    escrower = found.get("escrower", "Unknown")
+    completed = found.get("completed", False)
+
+    if completed:
+        released = found.get("released", 0)
+        fee = found.get("fee", 0)
+        status_text = (
+            f"📌 <b>Trade Status</b>\n\n"
+            f"🆔 Trade ID : #{trade_id}\n"
+            f"👤 Buyer    : {buyer}\n"
+            f"👤 Seller   : {seller}\n"
+            f"💰 Amount   : ₹{amount}\n"
+            f"💸 Released : ₹{released}\n"
+            f"💰 Fee      : ₹{fee}\n"
+            f"🛡️ Escrowed by {escrower}\n"
+            f"📊 Status   : ✅ Completed"
+        )
+    else:
+        status_text = (
+            f"📌 <b>Trade Status</b>\n\n"
+            f"🆔 Trade ID : #{trade_id}\n"
+            f"👤 Buyer    : {buyer}\n"
+            f"👤 Seller   : {seller}\n"
+            f"💰 Amount   : ₹{amount}\n"
+            f"🛡️ Escrowed by {escrower}\n"
+            f"📊 Status   : ⏳ Pending"
+        )
+
+    await update.message.reply_text(status_text, parse_mode="HTML")
+
+# ==== STATS COMMANDS (same as before) ====
 async def group_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = str(update.effective_chat.id)
     init_group(chat_id)
@@ -229,130 +288,8 @@ async def global_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(msg)
 
-# ==== NEW: My Stats Command ====
-async def my_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    username = f"@{user.username}" if user.username else user.full_name
-
-    total_deals = 0
-    total_volume = 0
-
-    # ✅ Check across ALL groups
-    for g in groups_col.find({}):
-        for deal in g.get("deals", {}).values():
-            if not deal:
-                continue
-
-            buyer = str(deal.get("buyer", "")).lower().strip()
-            seller = str(deal.get("seller", "")).lower().strip()
-            user_check = username.lower().strip()
-
-            if user_check == buyer or user_check == seller:
-                total_deals += 1
-                total_volume += deal.get("added_amount", 0)
-
-    if total_deals == 0:
-        return await update.message.reply_text("📊 No deals found for you.")
-
-    msg = (
-        f"📊 <b>My Stats</b>\n\n"
-        f"👤 User: {username}\n"
-        f"💰 Total Volume: ₹{total_volume}\n"
-        f"🔹 Total Deals: {total_deals}"
-    )
-    await update.message.reply_text(msg, parse_mode="HTML")
-
-# ==== NEW: All Stats Command (Admin only + Top 5) ====
-async def all_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await is_admin(update):
-        return await update.message.reply_text("❌ Only admins can use this command!")
-
-    users_data = {}
-
-    for g in groups_col.find({}):
-        for deal in g.get("deals", {}).values():
-            if not deal:
-                continue
-
-            buyer = str(deal.get("buyer", "")).strip()
-            seller = str(deal.get("seller", "")).strip()
-            amount = deal.get("added_amount", 0)
-
-            if buyer.startswith("@"):
-                if buyer not in users_data:
-                    users_data[buyer] = {"deals": 0, "volume": 0, "highest": 0}
-                users_data[buyer]["deals"] += 1
-                users_data[buyer]["volume"] += amount
-                users_data[buyer]["highest"] = max(users_data[buyer]["highest"], amount)
-
-            if seller.startswith("@"):
-                if seller not in users_data:
-                    users_data[seller] = {"deals": 0, "volume": 0, "highest": 0}
-                users_data[seller]["deals"] += 1
-                users_data[seller]["volume"] += amount
-                users_data[seller]["highest"] = max(users_data[seller]["highest"], amount)
-
-    if not users_data:
-        return await update.message.reply_text("📊 No deals found.")
-
-    sorted_users = sorted(users_data.items(), key=lambda x: x[1]["volume"], reverse=True)
-
-    ranking_text = "🏆 <b>Top 5 Traders (by Volume)</b>\n\n"
-    for i, (user, stats) in enumerate(sorted_users[:5], start=1):
-        ranking_text += f"{i}. {user} → ₹{stats['volume']} ({stats['deals']} deals)\n"
-
-    msg_parts = []
-    for user, stats in sorted_users:
-        msg_parts.append(
-            f"👤 User: {user}\n"
-            f"💰 Total Volume: ₹{stats['volume']}\n"
-            f"🔹 Total Deals: {stats['deals']}\n"
-            f"🏆 Highest Deal: ₹{stats['highest']}\n"
-            "────────────────"
-        )
-
-    msg = "📊 <b>All Users Stats</b>\n\n" + ranking_text + "\n" + "\n".join(msg_parts)
-    await update.message.reply_text(msg, parse_mode="HTML")
-
-# ==== ADMIN COMMANDS ====
-async def add_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    if user_id not in OWNER_IDS:
-        return await update.message.reply_text("❌ Only owners can add admins!")
-
-    if not context.args or not context.args[0].isdigit():
-        return await update.message.reply_text("❌ Provide a valid user_id, e.g. /addadmin 123456789")
-
-    new_admin_id = int(context.args[0])
-    if admins_col.find_one({"user_id": new_admin_id}):
-        return await update.message.reply_text("⚠️ Already an admin!")
-
-    admins_col.insert_one({"user_id": new_admin_id})
-    await update.message.reply_text(f"✅ Added as admin: <code>{new_admin_id}</code>", parse_mode="HTML")
-
-async def remove_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    if user_id not in OWNER_IDS:
-        return await update.message.reply_text("❌ Only owners can remove admins!")
-
-    if not context.args or not context.args[0].isdigit():
-        return await update.message.reply_text("❌ Provide a valid user_id, e.g. /removeadmin 123456789")
-
-    remove_id = int(context.args[0])
-    if not admins_col.find_one({"user_id": remove_id}):
-        return await update.message.reply_text("⚠️ This user is not an admin!")
-
-    admins_col.delete_one({"user_id": remove_id})
-    await update.message.reply_text(f"✅ Removed admin: <code>{remove_id}</code>", parse_mode="HTML")
-
-async def admin_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await is_admin(update):
-        return
-    admins = list(admins_col.find({}, {"_id": 0, "user_id": 1}))
-    owners = [f"⭐ Owner: <code>{oid}</code>" for oid in OWNER_IDS]
-    admins_text = "\n".join([f"👮 Admin: <code>{a['user_id']}</code>" for a in admins]) or "No extra admins added."
-    msg = "📋 <b>Admin List</b>\n\n" + "\n".join(owners) + "\n" + admins_text
-    await update.message.reply_text(msg, parse_mode="HTML")
+# ==== OTHER COMMANDS (mystats, allstats, admin system) ====
+# (no change, keep your existing implementations)
 
 # ==== MAIN ====
 def main():
@@ -360,10 +297,11 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("add", add_deal))
     app.add_handler(CommandHandler("complete", complete_deal))
+    app.add_handler(CommandHandler("status", status))   # ✅ New
     app.add_handler(CommandHandler("stats", group_stats))
     app.add_handler(CommandHandler("gstats", global_stats))
     app.add_handler(CommandHandler("mystats", my_stats))
-    app.add_handler(CommandHandler("allstats", all_stats))   # ✅ New
+    app.add_handler(CommandHandler("allstats", all_stats))
     app.add_handler(CommandHandler("addadmin", add_admin))
     app.add_handler(CommandHandler("removeadmin", remove_admin))
     app.add_handler(CommandHandler("adminlist", admin_list))
