@@ -386,6 +386,16 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("add", add_deal))
     app.add_handler(CommandHandler("complete", complete_deal))
-    app.add_handler(CommandHandler("status", deal_status))   # ✅ New
+    app.add_handler(CommandHandler("status", deal_status))   # ✅ New handler
     app.add_handler(CommandHandler("stats", group_stats))
-    app.add_handler(CommandHandler("g
+    app.add_handler(CommandHandler("gstats", global_stats))
+    app.add_handler(CommandHandler("mystats", my_stats))
+    app.add_handler(CommandHandler("allstats", all_stats))
+    app.add_handler(CommandHandler("addadmin", add_admin))
+    app.add_handler(CommandHandler("removeadmin", remove_admin))
+    app.add_handler(CommandHandler("adminlist", admin_list))
+    print("Bot started... ✅")
+    app.run_polling()
+
+if __name__ == "__main__":
+    main()
