@@ -5,8 +5,8 @@ from telegram.ext import Application, CommandHandler, ContextTypes
 from pymongo import MongoClient
 
 # ==== CONFIG ====
-BOT_TOKEN = "7095431388:AAFcFJwTVT5r5f0K1NQempMh_zEfU8ICquA"
-MONGO_URI = "mongodb+srv://afzal99550:afzal99550@cluster0.aqmbh9q.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+BOT_TOKEN = "YOUR_BOT_TOKEN"
+MONGO_URI = "YOUR_MONGO_URI"
 LOG_CHANNEL_ID = -1002161414780
 
 # Multiple owner IDs
@@ -77,21 +77,19 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(msg, parse_mode="HTML")
 
+# ==== /add ====
 async def add_deal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin(update):
         return
-    try:
-        await update.message.delete()
-    except:
-        pass
+    try: await update.message.delete()
+    except: pass
+
     if not update.message.reply_to_message:
         return await update.message.reply_text("❌ Reply to the DEAL INFO message!")
-
     if not context.args or not context.args[0].replace(".", "", 1).isdigit():
         return await update.message.reply_text("❌ Please provide amount like /add 50")
 
     amount = float(context.args[0])
-
     original_text = update.message.reply_to_message.text
     chat_id = str(update.effective_chat.id)
     reply_id = str(update.message.reply_to_message.message_id)
@@ -114,12 +112,11 @@ async def add_deal(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "completed": False,
         "buyer": buyer,
         "seller": seller,
-        "escrower": escrower   # ✅ Store escrower in deal
+        "escrower": escrower
     }
 
     g["deals"] = deals
     groups_col.update_one({"_id": chat_id}, {"$set": g})
-
     update_escrower_stats(chat_id, escrower, amount)
 
     msg = (
@@ -134,38 +131,32 @@ async def add_deal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.effective_chat.send_message(msg, reply_to_message_id=update.message.reply_to_message.message_id, parse_mode="HTML")
 
+# ==== /complete ====
 async def complete_deal(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await is_admin(update):
-        return
-    try:
-        await update.message.delete()
-    except:
-        pass
+    if not await is_admin(update): return
+    try: await update.message.delete()
+    except: pass
+
     if not update.message.reply_to_message:
         return await update.message.reply_text("❌ Reply to the DEAL INFO message!")
-
     if not context.args or not context.args[0].replace(".", "", 1).isdigit():
         return await update.message.reply_text("❌ Please provide amount like /complete 50")
 
     released = float(context.args[0])
-
     chat_id = str(update.effective_chat.id)
     reply_id = str(update.message.reply_to_message.message_id)
     g = groups_col.find_one({"_id": chat_id})
     deal_info = g["deals"].get(reply_id)
 
-    if not deal_info:
-        return await update.message.reply_text("❌ Deal not found!")
-    if deal_info["completed"]:
-        return await update.message.reply_text("⚠️ Already completed!")
+    if not deal_info: return await update.message.reply_text("❌ Deal not found!")
+    if deal_info["completed"]: return await update.message.reply_text("⚠️ Already completed!")
 
     deal_info["completed"] = True
-    deal_info["released"] = released   # ✅ store released
+    deal_info["released"] = released
     added_amount = deal_info["added_amount"]
     fee = added_amount - released if added_amount > released else 0
-    deal_info["fee"] = fee             # ✅ store fee
+    deal_info["fee"] = fee
     g["deals"][reply_id] = deal_info
-
     g["total_fee"] += fee
     groups_col.update_one({"_id": chat_id}, {"$set": g})
 
@@ -182,7 +173,7 @@ async def complete_deal(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"✅ <b>Deal Completed!</b>\n"
         "────────────────\n"
         f"👤 Buyer  : {buyer}\n"
-        f"👤 Seller  : {seller}\n"
+        f"👤 Seller : {seller}\n"
         f"💸 Released : ₹{released}\n"
         f"🆔 Trade ID : #{trade_id}\n"
         f"💰 Fee     : ₹{fee}\n"
@@ -191,40 +182,23 @@ async def complete_deal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.effective_chat.send_message(msg, reply_to_message_id=update.message.reply_to_message.message_id, parse_mode="HTML")
 
-    log_msg = (
-        "📜 <b>Deal Completed (Log)</b>\n"
-        "────────────────\n"
-        f"👤 Buyer   : {buyer}\n"
-        f"👤 Seller  : {seller}\n"
-        f"💸 Released: ₹{released}\n"
-        f"🆔 Trade ID: #{trade_id}\n"
-        f"💰 Fee     : ₹{fee}\n"
-        f"🛡️ Escrowed by {escrower}\n"
-        f"📌 Group: {update.effective_chat.title} ({update.effective_chat.id})"
-    )
-    await context.bot.send_message(LOG_CHANNEL_ID, log_msg, parse_mode="HTML")
-
-# ==== NEW: Status Command (Admin only) ====
+# ==== /status ====
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin(update):
         return await update.message.reply_text("❌ Only admins can use this command!")
-
     if not context.args:
         return await update.message.reply_text("❌ Usage: /status <Trade ID>")
 
-    trade_id = context.args[0].strip().replace("#", "").upper()
-
+    trade_id = context.args[0].replace("#", "").upper()
     found = None
     for g in groups_col.find({}):
         for deal in g.get("deals", {}).values():
-            if deal and deal.get("trade_id") == trade_id:
+            if deal.get("trade_id") == trade_id:
                 found = deal
                 break
-        if found:
-            break
+        if found: break
 
-    if not found:
-        return await update.message.reply_text(f"❌ Trade ID {trade_id} not found!")
+    if not found: return await update.message.reply_text(f"❌ Trade ID {trade_id} not found!")
 
     buyer = found.get("buyer", "Unknown")
     seller = found.get("seller", "Unknown")
@@ -259,7 +233,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(status_text, parse_mode="HTML")
 
-# ==== STATS COMMANDS (same as before) ====
+# ==== /stats ====
 async def group_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = str(update.effective_chat.id)
     init_group(chat_id)
@@ -274,9 +248,9 @@ async def group_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(msg)
 
+# ==== /gstats ====
 async def global_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await is_admin(update):
-        return
+    if not await is_admin(update): return
     g = global_col.find_one({"_id": "stats"})
     escrowers_text = "\n".join([f"{name} = ₹{amt}" for name, amt in g["escrowers"].items()]) or "No deals yet"
     msg = (
@@ -288,8 +262,56 @@ async def global_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(msg)
 
-# ==== OTHER COMMANDS (mystats, allstats, admin system) ====
-# (no change, keep your existing implementations)
+# ==== /mystats ====
+async def my_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = f"@{update.effective_user.username}" if update.effective_user.username else update.effective_user.full_name
+    total_buyer, total_seller = 0, 0
+    for g in groups_col.find({}):
+        for d in g.get("deals", {}).values():
+            if d.get("buyer") == user:
+                total_buyer += d.get("added_amount", 0)
+            if d.get("seller") == user:
+                total_seller += d.get("added_amount", 0)
+    msg = (
+        f"📊 My Stats\n\n"
+        f"🛒 As Buyer : ₹{total_buyer}\n"
+        f"🏷️ As Seller: ₹{total_seller}"
+    )
+    await update.message.reply_text(msg)
+
+# ==== /allstats ====
+async def all_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await is_admin(update): return
+    stats = {}
+    for g in groups_col.find({}):
+        for d in g.get("deals", {}).values():
+            buyer, seller = d.get("buyer", "Unknown"), d.get("seller", "Unknown")
+            stats[buyer] = stats.get(buyer, 0) + d.get("added_amount", 0)
+            stats[seller] = stats.get(seller, 0) + d.get("added_amount", 0)
+    text = "\n".join([f"{u}: ₹{amt}" for u, amt in stats.items()]) or "No deals yet"
+    await update.message.reply_text(f"📊 All Users Stats\n\n{text}")
+
+# ==== Admin system (/addadmin, /removeadmin, /adminlist) ====
+async def add_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id not in OWNER_IDS:
+        return await update.message.reply_text("❌ Only owners can add admins!")
+    if not context.args: return await update.message.reply_text("Usage: /addadmin user_id")
+    uid = int(context.args[0])
+    admins_col.update_one({"user_id": uid}, {"$set": {"user_id": uid}}, upsert=True)
+    await update.message.reply_text(f"✅ Added {uid} as admin.")
+
+async def remove_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id not in OWNER_IDS:
+        return await update.message.reply_text("❌ Only owners can remove admins!")
+    if not context.args: return await update.message.reply_text("Usage: /removeadmin user_id")
+    uid = int(context.args[0])
+    admins_col.delete_one({"user_id": uid})
+    await update.message.reply_text(f"✅ Removed {uid} from admins.")
+
+async def admin_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    admins = [str(a["user_id"]) for a in admins_col.find({})]
+    text = "\n".join(admins) or "No admins yet"
+    await update.message.reply_text(f"👮 Admins:\n{text}")
 
 # ==== MAIN ====
 def main():
@@ -297,7 +319,7 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("add", add_deal))
     app.add_handler(CommandHandler("complete", complete_deal))
-    app.add_handler(CommandHandler("status", status))   # ✅ New
+    app.add_handler(CommandHandler("status", status))
     app.add_handler(CommandHandler("stats", group_stats))
     app.add_handler(CommandHandler("gstats", global_stats))
     app.add_handler(CommandHandler("mystats", my_stats))
