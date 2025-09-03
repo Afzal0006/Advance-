@@ -7,7 +7,7 @@ from pymongo import MongoClient
 # ==== CONFIG ====
 BOT_TOKEN = "7095431388:AAFcFJwTVT5r5f0K1NQempMh_zEfU8ICquA"
 MONGO_URI = "mongodb+srv://afzal99550:afzal99550@cluster0.aqmbh9q.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-LOG_CHANNEL_ID = -1001333854359
+LOG_CHANNEL_ID = -1002826823679
 
 # Multiple owner IDs
 OWNER_IDS = [6998916494]  # Add as many IDs as you want
@@ -98,8 +98,8 @@ async def add_deal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     buyer_match = re.search(r"BUYER\s*:\s*(@\w+)", original_text, re.IGNORECASE)
     seller_match = re.search(r"SELLER\s*:\s*(@\w+)", original_text, re.IGNORECASE)
 
-    buyer = buyer_match.group(1) if buyer_match else "Unknown"
-    seller = seller_match.group(1) if seller_match else "Unknown"
+    buyer = buyer_match.group(1).strip() if buyer_match else "Unknown"
+    seller = seller_match.group(1).strip() if seller_match else "Unknown"
 
     g = groups_col.find_one({"_id": chat_id})
     deals = g["deals"]
@@ -241,7 +241,12 @@ async def my_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for deal in g.get("deals", {}).values():
             if not deal:
                 continue
-            if deal.get("buyer") == username or deal.get("seller") == username:
+
+            buyer = str(deal.get("buyer", "")).lower().strip()
+            seller = str(deal.get("seller", "")).lower().strip()
+            user_check = username.lower().strip()
+
+            if user_check == buyer or user_check == seller:
                 total_deals += 1
                 total_volume += deal.get("added_amount", 0)
 
