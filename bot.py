@@ -232,6 +232,32 @@ async def deal_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"📊 Status: {status}"
     )
     await update.message.reply_text(msg, parse_mode="HTML")
+    # ==== ONGOING DEALS (OWNER ONLY) ====
+async def ongoing_deals(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if user_id not in OWNER_IDS:
+        return await update.message.reply_text("❌ Only owners can use this command!")
+
+    pending_list = []
+    for g in groups_col.find({}):
+        group_name = g.get("title", f"Group {g['_id']}")
+        for deal in g.get("deals", {}).values():
+            if deal and not deal.get("completed", False):
+                pending_list.append(
+                    f"🆔 <b>#{deal['trade_id']}</b>\n"
+                    f"👤 Buyer: {deal.get('buyer','Unknown')}\n"
+                    f"👤 Seller: {deal.get('seller','Unknown')}\n"
+                    f"💰 Amount: ₹{deal.get('added_amount',0)}\n"
+                    f"📌 Group: {group_name}\n"
+                    f"🛡️ Escrower: {deal.get('escrower','Unknown')}\n"
+                    "────────────────"
+                )
+
+    if not pending_list:
+        return await update.message.reply_text("📌 No ongoing deals found.", parse_mode="HTML")
+
+    msg = "📊 <b>Ongoing Deals</b>\n\n" + "\n".join(pending_list)
+    await update.message.reply_text(msg, parse_mode="HTML")
 
 # ==== STATS COMMANDS ====
 async def group_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -400,6 +426,7 @@ def main():
     app.add_handler(CommandHandler("addadmin", add_admin))
     app.add_handler(CommandHandler("removeadmin", remove_admin))
     app.add_handler(CommandHandler("adminlist", admin_list))
+    app.add_handler(CommandHandler("ongoing", ongoing_deals))
 
     print("Bot started... ✅")
     app.run_polling()
