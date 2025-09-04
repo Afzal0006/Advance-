@@ -243,13 +243,27 @@ async def ongoing_deals(update: Update, context: ContextTypes.DEFAULT_TYPE):
         group_name = g.get("title", f"Group {g['_id']}")
         for deal in g.get("deals", {}).values():
             if deal and not deal.get("completed", False):
+                escrower_id = deal.get("escrower")
+                escrower_name = "Unknown"
+
+                # ✅ Username fetch
+                if escrower_id:
+                    try:
+                        escrower_chat = await context.bot.get_chat(escrower_id)
+                        if escrower_chat.username:
+                            escrower_name = f"@{escrower_chat.username}"
+                        else:
+                            escrower_name = escrower_chat.full_name
+                    except:
+                        escrower_name = str(escrower_id)
+
                 pending_list.append(
                     f"🆔 <b>#{deal['trade_id']}</b>\n"
                     f"👤 Buyer: {deal.get('buyer','Unknown')}\n"
                     f"👤 Seller: {deal.get('seller','Unknown')}\n"
                     f"💰 Amount: ₹{deal.get('added_amount',0)}\n"
                     f"📌 Group: {group_name}\n"
-                    f"🛡️ Escrower: {deal.get('escrower')}\n"
+                    f"🛡️ Escrower: {escrower_name}\n"
                     "────────────────"
                 )
 
