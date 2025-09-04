@@ -263,7 +263,7 @@ async def ongoing_deals(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"👤 Seller: {deal.get('seller','Unknown')}\n"
                     f"💰 Amount: ₹{deal.get('added_amount',0)}\n"
                     f"📌 Group: {group_name}\n"
-                    f"🛡️ Escrower: {escrower}\n"
+                    f"🛡️ Escrower: {escrower_id}\n"
                     "────────────────"
                 )
 
