@@ -233,36 +233,7 @@ async def deal_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(msg, parse_mode="HTML")
 
-# ==== STATS COMMANDS ====
-async def group_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = str(update.effective_chat.id)
-    init_group(chat_id)
-    g = groups_col.find_one({"_id": chat_id})
-    escrowers_text = "\n".join([f"{name} = ₹{amt}" for name, amt in g["escrowers"].items()]) or "No deals yet"
-    msg = (
-        f"📊 Group Stats\n\n"
-        f"{escrowers_text}\n\n"
-        f"🔹 Total Deals: {g['total_deals']}\n"
-        f"💰 Total Volume: ₹{g['total_volume']}\n"
-        f"💸 Total Fee: ₹{g['total_fee']}"
-    )
-    await update.message.reply_text(msg)
-
-async def global_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await is_admin(update):
-        return
-    g = global_col.find_one({"_id": "stats"})
-    escrowers_text = "\n".join([f"{name} = ₹{amt}" for name, amt in g["escrowers"].items()]) or "No deals yet"
-    msg = (
-        f"🌍 Global Stats\n\n"
-        f"{escrowers_text}\n\n"
-        f"🔹 Total Deals: {g['total_deals']}\n"
-        f"💰 Total Volume: ₹{g['total_volume']}\n"
-        f"💸 Total Fee: ₹{g['total_fee']}"
-    )
-    await update.message.reply_text(msg)
-
-# ==== MY STATS ====
+# ==== STATS (Personal Stats) ====
 async def my_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     username = f"@{user.username}" if user.username else user.full_name
@@ -293,6 +264,7 @@ async def my_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🔹 Total Deals: {total_deals}"
     )
     await update.message.reply_text(msg, parse_mode="HTML")
+
 
 # ==== ALL STATS ====
 async def all_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -393,9 +365,8 @@ def main():
     app.add_handler(CommandHandler("add", add_deal))
     app.add_handler(CommandHandler("complete", complete_deal))
     app.add_handler(CommandHandler("status", deal_status))   # ✅ Trade ID se status
-    app.add_handler(CommandHandler("stats", group_stats))
+    app.add_handler(CommandHandler("stats", my_stats))   # 🔹 /stats = personal stats
     app.add_handler(CommandHandler("gstats", global_stats))
-    app.add_handler(CommandHandler("mystats", my_stats))
     app.add_handler(CommandHandler("allstats", all_stats))
     app.add_handler(CommandHandler("addadmin", add_admin))
     app.add_handler(CommandHandler("removeadmin", remove_admin))
@@ -403,7 +374,3 @@ def main():
 
     print("Bot started... ✅")
     app.run_polling()
-
-
-if __name__ == "__main__":
-    main()
