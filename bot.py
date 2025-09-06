@@ -251,9 +251,15 @@ async def global_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     username = f"@{user.username}" if user.username else user.full_name
+    user_check = username.lower().strip()
 
     total_deals = 0
     total_volume = 0
+    ongoing_deals = 0
+    highest_deal = 0
+
+    # sabhi deals check karenge
+    all_users = {}
 
     for g in groups_col.find({}):
         for deal in g.get("deals", {}).values():
@@ -262,23 +268,40 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             buyer = str(deal.get("buyer", "")).lower().strip()
             seller = str(deal.get("seller", "")).lower().strip()
-            user_check = username.lower().strip()
+            amount = deal.get("added_amount", 0)
+            completed = deal.get("completed", False)
 
+            # user ke stats
             if user_check == buyer or user_check == seller:
                 total_deals += 1
-                total_volume += deal.get("added_amount", 0)
+                total_volume += amount
+                highest_deal = max(highest_deal, amount)
+                if not completed:
+                    ongoing_deals += 1
+
+            # sabhi users ke liye ranking data bnao
+            for u in [buyer, seller]:
+                if u.startswith("@"):
+                    if u not in all_users:
+                        all_users[u] = {"volume": 0}
+                    all_users[u]["volume"] += amount
 
     if total_deals == 0:
         return await update.message.reply_text("📊 No deals found for you.")
 
+    # Ranking calculate
+    sorted_users = sorted(all_users.items(), key=lambda x: x[1]["volume"], reverse=True)
+    rank = next((i + 1 for i, (u, _) in enumerate(sorted_users) if u == user_check), "N/A")
+
     msg = (
-        f"📊 <b>My Stats</b>\n\n"
-        f"👤 User: {username}\n"
-        f"💰 Total Volume: ₹{total_volume}\n"
-        f"🔹 Total Deals: {total_deals}"
+        f"📊 <b>Participant Stats for {username}</b>\n\n"
+        f"👑 Ranking: {rank}\n"
+        f"📈 Total Volume: ₹{total_volume}\n"
+        f"🧳 Total Deals: {total_deals}\n"
+        f"🧿 Ongoing Deals: {ongoing_deals}\n"
+        f"💳 Highest Deal - ₹{highest_deal}"
     )
     await update.message.reply_text(msg, parse_mode="HTML")
-
 # ==== ALL STATS ====
 async def all_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin(update):
