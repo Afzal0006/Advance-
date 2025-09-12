@@ -1,5 +1,6 @@
 import re
 import random
+import os
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 from pymongo import MongoClient
@@ -209,7 +210,6 @@ async def deal_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     trade_id = context.args[0].strip().replace("#", "").upper()
     found = None
 
-    # Search all groups for trade_id
     for g in groups_col.find({}):
         for deal in g.get("deals", {}).values():
             if deal and deal.get("trade_id", "").upper() == trade_id:
@@ -258,7 +258,6 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ongoing_deals = 0
     highest_deal = 0
 
-    # sabhi deals check karenge
     all_users = {}
 
     for g in groups_col.find({}):
@@ -271,7 +270,6 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
             amount = deal.get("added_amount", 0)
             completed = deal.get("completed", False)
 
-            # user ke stats
             if user_check == buyer or user_check == seller:
                 total_deals += 1
                 total_volume += amount
@@ -279,7 +277,6 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if not completed:
                     ongoing_deals += 1
 
-            # sabhi users ke liye ranking data bnao
             for u in [buyer, seller]:
                 if u.startswith("@"):
                     if u not in all_users:
@@ -289,7 +286,6 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if total_deals == 0:
         return await update.message.reply_text("📊 No deals found for you.")
 
-    # Ranking calculate
     sorted_users = sorted(all_users.items(), key=lambda x: x[1]["volume"], reverse=True)
     rank = next((i + 1 for i, (u, _) in enumerate(sorted_users) if u == user_check), "N/A")
 
@@ -302,6 +298,7 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"💳 Highest Deal - ₹{highest_deal}"
     )
     await update.message.reply_text(msg, parse_mode="HTML")
+
 # ==== ALL STATS ====
 async def all_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin(update):
@@ -394,14 +391,14 @@ async def admin_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = "📋 <b>Admin List</b>\n\n" + "\n".join(owners) + "\n" + admins_text
     await update.message.reply_text(msg, parse_mode="HTML")
 
-# ==== MAIN ====
+# ==== MAIN (Webhook Fix) ====
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("add", add_deal))
     app.add_handler(CommandHandler("complete", complete_deal))
-    app.add_handler(CommandHandler("status", deal_status))   # ✅ Trade ID se status
-    app.add_handler(CommandHandler("stats", stats))   # 🔹 /stats = personal stats
+    app.add_handler(CommandHandler("status", deal_status))   # ✅ Trade ID se status check
+    app.add_handler(CommandHandler("stats", stats))          # ✅ Personal stats
     app.add_handler(CommandHandler("gstats", global_stats))
     app.add_handler(CommandHandler("allstats", all_stats))
     app.add_handler(CommandHandler("addadmin", add_admin))
@@ -409,7 +406,18 @@ def main():
     app.add_handler(CommandHandler("adminlist", admin_list))
 
     print("Bot started... ✅")
-    app.run_polling()
+
+    # ✅ Webhook mode (Heroku fix)
+    PORT = int(os.environ.get("PORT", 8443))
+    HEROKU_APP_NAME = os.environ.get("HEROKU_APP_NAME", "your-app-name")  # 👈 यहां अपना Heroku app name डालना
+    WEBHOOK_URL = f"https://{HEROKU_APP_NAME}.herokuapp.com/{BOT_TOKEN}"
+
+    app.run_webhook(
+        listen="0.0.0.0",
+        port=PORT,
+        url_path=BOT_TOKEN,
+        webhook_url=WEBHOOK_URL,
+    )
 
 
 if __name__ == "__main__":
