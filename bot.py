@@ -5,7 +5,7 @@ from telegram.ext import Application, CommandHandler, ContextTypes
 from pymongo import MongoClient
 
 # ==== CONFIG ====
-BOT_TOKEN = "8485351031:AAFpu1Oi44l4KQG_B04H9M07AHc3FvNd73I"
+BOT_TOKEN = "7095431388:AAFcFJwTVT5r5f0K1NQempMh_zEfU8ICquA"
 MONGO_URI = "mongodb+srv://TRUSTLYTRANSACTIONBOT:TRUSTLYTRANSACTIONBOT@cluster0.t60mxb7.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 LOG_CHANNEL_ID = -1002161414780
 
