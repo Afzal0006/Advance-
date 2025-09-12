@@ -409,7 +409,7 @@ def main():
 
     # ✅ Webhook mode (Heroku fix)
     PORT = int(os.environ.get("PORT", 8443))
-    HEROKU_APP_NAME = os.environ.get("HEROKU_APP_NAME", "your-app-name")  # 👈 यहां अपना Heroku app name डालना
+    HEROKU_APP_NAME = os.environ.get("newstatsbot", "your-app-name")  # 👈 यहां अपना Heroku app name डालना
     WEBHOOK_URL = f"https://{HEROKU_APP_NAME}.herokuapp.com/{BOT_TOKEN}"
 
     app.run_webhook(
