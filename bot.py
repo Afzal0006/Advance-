@@ -10,7 +10,7 @@ MONGO_URI = "mongodb+srv://TRUSTLYTRANSACTIONBOT:TRUSTLYTRANSACTIONBOT@cluster0.
 LOG_CHANNEL_ID = -1002330347621
 
 # Multiple owner IDs
-OWNER_IDS = [6998916494]  # Add as many IDs as you want
+OWNER_IDS = [6847499628]  # Add as many IDs as you want
 
 # ==== MONGO CONNECT ====
 client = MongoClient(MONGO_URI)
