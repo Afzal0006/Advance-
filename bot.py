@@ -5,9 +5,9 @@ from telegram.ext import Application, CommandHandler, ContextTypes
 from pymongo import MongoClient
 
 # ==== CONFIG ====
-BOT_TOKEN = "7643831340:AAGieuPJND4MekAutSf3xzta1qdoKo5mbZU"
+BOT_TOKEN = "8399143304:AAGCQEeM0mi11Yzw1aPa8g55lw96BRBk1kI"
 MONGO_URI = "mongodb+srv://TRUSTLYTRANSACTIONBOT:TRUSTLYTRANSACTIONBOT@cluster0.t60mxb7.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-LOG_CHANNEL_ID = -1002826823679
+LOG_CHANNEL_ID = -1002330347621
 
 # Multiple owner IDs
 OWNER_IDS = [6998916494]  # Add as many IDs as you want
