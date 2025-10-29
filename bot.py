@@ -503,6 +503,22 @@ async def pending_deals(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     await update.message.reply_text(text, parse_mode="HTML")
+
+# ==== Global escrow balance (all groups) ====
+async def global_escrow_balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Sirf admin hi check kar sakte hain
+    if not await is_admin(update):
+        return await update.message.reply_text("❌ Only admins can check balances!")
+
+    g = global_col.find_one({"_id": "stats"})
+    if not g or not g.get("escrowers"):
+        return await update.message.reply_text("📊 No global escrow data yet.")
+
+    text = "🌍 <b>Global Escrow Balances</b>\n\n"
+    for esc, amt in g["escrowers"].items():
+        text += f"{esc} → ₹{amt}\n"
+
+    await update.message.reply_text(text, parse_mode="HTML")
 # ==== MAIN ====
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
@@ -518,6 +534,7 @@ def main():
     app.add_handler(CommandHandler("addadmin", add_admin))
     app.add_handler(CommandHandler("removeadmin", remove_admin))
     app.add_handler(CommandHandler("adminlist", admin_list))
+    app.add_handler(CommandHandler("gescrowbalance", global_escrow_balance))
 
     print("Bot started... ✅")
     app.run_polling()
