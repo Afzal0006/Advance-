@@ -466,7 +466,7 @@ async def admin_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = "📋 <b>Admin List</b>\n\n" + "\n".join(owners) + "\n" + admins_text
     await update.message.reply_text(msg, parse_mode="HTML")
 
-# ==== Pending deals ====
+# ==== Pending deals (Fixed, top 100) ====
 async def pending_deals(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     username = f"@{user.username}" if user.username else user.full_name
@@ -476,28 +476,33 @@ async def pending_deals(update: Update, context: ContextTypes.DEFAULT_TYPE):
     pending_list = []
 
     for g in groups_col.find({}):
-        for rid, deal in (g.get("deals") or {}).items():
-            if not deal or deal.get("completed"):
+        deals = g.get("deals") or {}
+        for rid, deal in deals.items():
+            if not deal:
                 continue
-            buyer = str(deal.get("buyer", "")).lower()
-            seller = str(deal.get("seller", "")).lower()
+            if deal.get("completed"):
+                continue
+
+            buyer = str(deal.get("buyer", "Unknown")).lower().strip()
+            seller = str(deal.get("seller", "Unknown")).lower().strip()
+
+            # Admin sees all, user sees only own deals
             if isAdmin or (user_check == buyer or user_check == seller):
                 pending_list.append(deal)
 
     if not pending_list:
         return await update.message.reply_text("🎉 No pending deals found!")
 
-    text = "🔄 <b>Pending Deals</b>\n\n"
-    for i, deal in enumerate(pending_list[:10], start=1):
+    text = "🔄 <b>Pending Deals (Top 100)</b>\n\n"
+    for i, deal in enumerate(pending_list[:100], start=1):
         text += (
-            f"{i}. 🆔 #{deal['trade_id']} — ₹{deal['added_amount']}\n"
-            f"👤 Buyer: {deal['buyer']}\n"
-            f"👤 Seller: {deal['seller']}\n"
+            f"{i}. 🆔 #{deal.get('trade_id', 'N/A')} — ₹{deal.get('added_amount', 0)}\n"
+            f"👤 Buyer: {deal.get('buyer', 'Unknown')}\n"
+            f"👤 Seller: {deal.get('seller', 'Unknown')}\n"
             "────────────────\n"
         )
 
     await update.message.reply_text(text, parse_mode="HTML")
-
 # ==== MAIN ====
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
