@@ -394,6 +394,43 @@ async def admin_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = "📋 <b>Admin List</b>\n\n" + "\n".join(owners) + "\n" + admins_text
     await update.message.reply_text(msg, parse_mode="HTML")
 
+# ==== PENDING DEALS ====
+async def pending_deals(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    username = f"@{user.username}" if user.username else user.full_name
+    user_check = username.lower().strip()
+    isAdmin = await is_admin(update)
+
+    pending_list = []
+    chat_id = str(update.effective_chat.id)
+
+    for g in groups_col.find({}):
+        for reply_id, deal in g.get("deals", {}).items():
+            if not deal: continue
+            if deal.get("completed"): continue
+
+            buyer = str(deal.get("buyer", "")).lower()
+            seller = str(deal.get("seller", "")).lower()
+
+            # Admin - All pending | User - Only personal deals
+            if isAdmin or (user_check == buyer or user_check == seller):
+                pending_list.append(deal)
+
+    if not pending_list:
+        return await update.message.reply_text("🎉 No pending deals found!")
+
+    text = "🔄 <b>Pending Deals</b>\n\n"
+
+    for i, deal in enumerate(pending_list[:10], start=1):  # Top 10 only
+        text += (
+            f"{i}. 🆔 #{deal['trade_id']} — ₹{deal['added_amount']}\n"
+            f"👤 Buyer: {deal['buyer']}\n"
+            f"👤 Seller: {deal['seller']}\n"
+            "────────────────\n"
+        )
+
+    await update.message.reply_text(text, parse_mode="HTML")
+
 # ==== MAIN ====
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
@@ -405,6 +442,7 @@ def main():
     app.add_handler(CommandHandler("gstats", global_stats))
     app.add_handler(CommandHandler("allstats", all_stats))
     app.add_handler(CommandHandler("addadmin", add_admin))
+    app.add_handler(CommandHandler("pending", pending_deals))
     app.add_handler(CommandHandler("removeadmin", remove_admin))
     app.add_handler(CommandHandler("adminlist", admin_list))
 
