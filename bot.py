@@ -546,52 +546,73 @@ async def holding(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ==== My Deals (Simple View) ====
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import CallbackQueryHandler
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import CallbackQueryHandler, CommandHandler
 
-DEALS_PER_PAGE = 50
+DEALS_PER_PAGE = 2  # Change this number to show more/fewer deals per page
 
+# ==== MyDeals Function (Paginated) ====
 async def mydeals(update, context, page=0):
     user = update.effective_user
     username = f"@{user.username}" if user.username else user.full_name
 
-    # Collect all deals for user
-    user_deals = []
+    # Collect user deals
+    pending_deals = []
+    completed_deals = []
+    total_hold = 0
+
     for g in groups_col.find({}):
         for deal in g.get("deals", {}).values():
             if deal.get("escrower") == username:
                 trade_id = deal.get("trade_id", "Unknown")
                 amount = float(deal.get("added_amount", 0))
-                status = "✅" if deal.get("completed") else "🕒"
-                user_deals.append(f"{status} #{trade_id} → ₹{amount:.2f}")
+                if deal.get("completed"):
+                    completed_deals.append(f"#{trade_id}")
+                else:
+                    pending_deals.append(f"#{trade_id} → ₹{amount:.2f}")
+                    total_hold += amount
 
-    if not user_deals:
+    all_deals = []
+    if pending_deals:
+        all_deals.append(f"🕒 Active Deals: ({len(pending_deals)})")
+        all_deals.extend(pending_deals)
+        all_deals.append(f"💼 Total Holding: ₹{total_hold:.2f}")
+    if completed_deals:
+        all_deals.append("────────────────")
+        all_deals.append(f"✅ Completed Deals ({len(completed_deals)}):")
+        all_deals.extend(completed_deals)
+
+    if not all_deals:
         return await update.message.reply_text("🎉 You have no deals yet!")
 
     # Pagination
     start = page * DEALS_PER_PAGE
     end = start + DEALS_PER_PAGE
-    deals_page = user_deals[start:end]
+    deals_page = all_deals[start:end]
 
-    text = f"📜 <b>Your Deals (Page {page+1})</b>\n────────────────\n"
+    text = "📜 <b>Your Deals Summary</b>\n────────────────\n"
     text += "\n".join(deals_page)
 
     # Inline buttons
     buttons = []
     if start > 0:
         buttons.append(InlineKeyboardButton("⏮️ Prev", callback_data=f"mydeals:{page-1}"))
-    if end < len(user_deals):
+    if end < len(all_deals):
         buttons.append(InlineKeyboardButton("Next ⏭️", callback_data=f"mydeals:{page+1}"))
 
     reply_markup = InlineKeyboardMarkup([buttons]) if buttons else None
-
     await update.message.reply_text(text, parse_mode="HTML", reply_markup=reply_markup)
 
-# Callback for pagination
+# ==== Callback for Pagination Buttons ====
 async def mydeals_callback(update, context):
     query = update.callback_query
     await query.answer()
     page = int(query.data.split(":")[1])
     await mydeals(update, context, page=page)
+
+# ==== Handlers Add ====
+application.add_handler(CommandHandler("mydeals", mydeals))
+application.add_handler(CallbackQueryHandler(mydeals_callback, pattern=r"mydeals:\d+"))
 # ==== MAIN ====
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
