@@ -610,10 +610,6 @@ async def mydeals_callback(update, context):
     page = int(query.data.split(":")[1])
     await mydeals(update, context, page=page)
 
-# ==== Handlers Add ====
-application.add_handler(CommandHandler("mydeals", mydeals))
-application.add_handler(CallbackQueryHandler(mydeals_callback, pattern=r"mydeals:\d+"))
-# ==== MAIN ====
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
