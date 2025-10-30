@@ -88,6 +88,7 @@ async def add_deal(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.delete()
     except:
         pass
+
     if not update.message.reply_to_message:
         return await update.message.reply_text("❌ Reply to the DEAL INFO message!")
 
@@ -108,19 +109,23 @@ async def add_deal(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     g = groups_col.find_one({"_id": chat_id})
     deals = g["deals"]
+
+    escrower = extract_username_from_user(update.effective_user)
     trade_id = f"TID{random.randint(100000, 999999)}"
+
+    # ✅ Added "escrower" field
     deals[reply_id] = {
         "trade_id": trade_id,
         "added_amount": amount,
         "completed": False,
         "buyer": buyer,
-        "seller": seller
-        "escrower": f"@{user.username}" if user.username else user.full_name,
+        "seller": seller,
+        "escrower": escrower
     }
+
     g["deals"] = deals
     groups_col.update_one({"_id": chat_id}, {"$set": g})
 
-    escrower = extract_username_from_user(update.effective_user)
     update_escrower_stats(chat_id, escrower, amount)
 
     msg = (
@@ -133,8 +138,12 @@ async def add_deal(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "────────────────\n"
         f"🛡️ Escrowed by {escrower}"
     )
-    await update.effective_chat.send_message(msg, reply_to_message_id=update.message.reply_to_message.message_id, parse_mode="HTML")
 
+    await update.effective_chat.send_message(
+        msg,
+        reply_to_message_id=update.message.reply_to_message.message_id,
+        parse_mode="HTML"
+    )
 # ==== Complete deal (reply-based) ====
 async def complete_deal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin(update):
