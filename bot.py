@@ -548,33 +548,49 @@ async def holding(update: Update, context: ContextTypes.DEFAULT_TYPE):
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackQueryHandler, CommandHandler
 
-DEALS_PER_PAGE = 12  # number of completed deals per page
+DEALS_PER_PAGE = 100  # number of completed deals per page
+MAX_DEALS = 100      # show only latest 100 deals
 
 async def mydeals(update, context, page=0):
     user = update.effective_user
     username = f"@{user.username}" if user.username else user.full_name
 
     # Collect user deals
-    pending_deals = []
-    completed_deals = []
-    total_hold = 0
-
+    all_user_deals = []
     for g in groups_col.find({}):
         for deal in g.get("deals", {}).values():
             if deal.get("escrower") == username:
-                trade_id = deal.get("trade_id", "Unknown")
-                amount = float(deal.get("added_amount", 0))
-                if deal.get("completed"):
-                    completed_deals.append(f"#{trade_id}")
-                else:
-                    pending_deals.append(f"#{trade_id} → ₹{amount:.2f}")
-                    total_hold += amount
+                all_user_deals.append(deal)
 
-    if not pending_deals and not completed_deals:
+    if not all_user_deals:
         return await update.message.reply_text("🎉 You have no deals yet!")
 
-    # Active deals text (only on first page)
+    # Sort deals by trade_id (assuming trade_id increases over time)
+    all_user_deals.sort(key=lambda x: x.get("trade_id"))
+
+    # Keep only latest 100 deals
+    latest_deals = all_user_deals[-MAX_DEALS:]
+
+    # Separate pending & completed
+    pending_deals = []
+    completed_deals = []
+    total_hold = 0
+    completed_counter = 0  # for numbering 101, 102...
+
+    for deal in latest_deals:
+        trade_id = deal.get("trade_id", "Unknown")
+        amount = float(deal.get("added_amount", 0))
+        if deal.get("completed"):
+            completed_counter += 1
+            completed_deals.append(f"{completed_counter}. #{trade_id}")
+        else:
+            pending_deals.append(f"#{trade_id} → ₹{amount:.2f}")
+            total_hold += amount
+
+    # Build text
     text_lines = []
+
+    # Active deals (only first page)
     if page == 0:
         if pending_deals:
             text_lines.append(f"🕒 Active Deals: ({len(pending_deals)})")
@@ -593,33 +609,16 @@ async def mydeals(update, context, page=0):
 
         if page == 0:
             text_lines.append(f"✅ Completed Deals ({len(completed_deals)}):")
-        text_lines.extend(chunk)
-
-        # If chunk empty
-        if not chunk:
+        if chunk:
+            text_lines.extend(chunk)
+        else:
             text_lines.append("No more completed deals.")
     else:
         if page == 0:
             text_lines.append("✅ No completed deals yet.")
 
-    # Inline buttons
-    buttons = []
-    if page > 0:
-        buttons.append(InlineKeyboardButton("⏮️ Prev", callback_data=f"mydeals:{page-1}"))
-    if completed_deals and end < len(completed_deals):
-        buttons.append(InlineKeyboardButton("Next ⏭️", callback_data=f"mydeals:{page+1}"))
-
-    reply_markup = InlineKeyboardMarkup([buttons]) if buttons else None
     text = "📜 <b>Your Deals Summary</b>\n────────────────\n" + "\n".join(text_lines)
-    await update.message.reply_text(text, parse_mode="HTML", reply_markup=reply_markup)
-
-
-# Callback
-async def mydeals_callback(update, context):
-    query = update.callback_query
-    await query.answer()
-    page = int(query.data.split(":")[1])
-    await mydeals(update, context, page=page)
+    await update.message.reply_text(text, parse_mode="HTML")
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
