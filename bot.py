@@ -548,9 +548,9 @@ async def holding(update: Update, context: ContextTypes.DEFAULT_TYPE):
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackQueryHandler, CommandHandler
 
-DEALS_PER_PAGE = 8  # change as needed, safe: 30-50
+DEALS_PER_PAGE = 20  # number of deals per page
 
-# ==== Paginated /mydeals ====
+# ==== MyDeals Function ====
 async def mydeals(update, context, page=0):
     user = update.effective_user
     username = f"@{user.username}" if user.username else user.full_name
@@ -574,9 +574,9 @@ async def mydeals(update, context, page=0):
     if not pending_deals and not completed_deals:
         return await update.message.reply_text("🎉 You have no deals yet!")
 
-    # Build text
-    text_lines = ["📜 <b>Your Deals Summary</b>", "────────────────"]
-    
+    # Build pages
+    text_lines = []
+
     # Active Deals
     if pending_deals:
         text_lines.append(f"🕒 Active Deals: ({len(pending_deals)})")
@@ -584,35 +584,43 @@ async def mydeals(update, context, page=0):
         text_lines.append(f"💼 Total Holding: ₹{total_hold:.2f}")
     else:
         text_lines.append("🕒 No active deals found.")
-    
-    # Completed Deals
+
+    text_lines.append("────────────────")
+
+    # Completed Deals (paginated)
     if completed_deals:
-        text_lines.append("────────────────")
         text_lines.append(f"✅ Completed Deals ({len(completed_deals)}):")
-        text_lines.extend(completed_deals)
+        # Split completed deals into chunks of DEALS_PER_PAGE
+        completed_chunks = [completed_deals[i:i+DEALS_PER_PAGE] for i in range(0, len(completed_deals), DEALS_PER_PAGE)]
     else:
-        text_lines.append("────────────────")
-        text_lines.append("✅ No completed deals yet.")
+        completed_chunks = []
 
-    # Pagination
-    start = page * DEALS_PER_PAGE
-    end = start + DEALS_PER_PAGE
-    deals_page = text_lines[start:end]
+    # Combine text for current page
+    current_page_lines = text_lines.copy()
+    # Determine which chunk of completed deals to show based on page
+    if completed_chunks:
+        if page < len(completed_chunks):
+            current_page_lines.extend(completed_chunks[page])
+        else:
+            # fallback to last page
+            page = len(completed_chunks) - 1
+            current_page_lines.extend(completed_chunks[page])
 
-    text = "\n".join(deals_page)
+    text = "📜 <b>Your Deals Summary</b>\n────────────────\n" + "\n".join(current_page_lines)
 
     # Inline buttons
     buttons = []
-    if start > 0:
+    if page > 0:
         buttons.append(InlineKeyboardButton("⏮️ Prev", callback_data=f"mydeals:{page-1}"))
-    if end < len(text_lines):
+    if completed_chunks and page < len(completed_chunks) - 1:
         buttons.append(InlineKeyboardButton("Next ⏭️", callback_data=f"mydeals:{page+1}"))
 
     reply_markup = InlineKeyboardMarkup([buttons]) if buttons else None
 
     await update.message.reply_text(text, parse_mode="HTML", reply_markup=reply_markup)
 
-# ==== Callback for pagination buttons ====
+
+# ==== Callback for Pagination ====
 async def mydeals_callback(update, context):
     query = update.callback_query
     await query.answer()
