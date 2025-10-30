@@ -548,7 +548,7 @@ async def holding(update: Update, context: ContextTypes.DEFAULT_TYPE):
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackQueryHandler, CommandHandler
 
-DEALS_PER_PAGE = 20  # number of deals per page
+DEALS_PER_PAGE = 12  # number of deals per page
 
 # ==== MyDeals Function ====
 async def mydeals(update, context, page=0):
