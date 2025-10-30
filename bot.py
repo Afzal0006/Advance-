@@ -115,6 +115,7 @@ async def add_deal(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "completed": False,
         "buyer": buyer,
         "seller": seller
+        "escrower": f"@{user.username}" if user.username else user.full_name,
     }
     g["deals"] = deals
     groups_col.update_one({"_id": chat_id}, {"$set": g})
