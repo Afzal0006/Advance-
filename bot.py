@@ -502,6 +502,38 @@ async def pending_deals(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(text, parse_mode="HTML")
 
+async def holding(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    isAdmin = await is_admin(update)
+
+    # ✅ Sirf admin hi use kar sake
+    if not isAdmin:
+        return await update.message.reply_text("❌ Only admins can use this command!")
+
+    holdings = {}
+
+    # 🔍 Har group ke deals check karte hain
+    for g in groups_col.find({}):
+        for deal in g.get("deals", {}).values():
+            if deal and not deal.get("completed"):
+                escrower = deal.get("escrower", "Unknown")
+                amount = float(deal.get("added_amount", 0))
+                holdings[escrower] = holdings.get(escrower, 0) + amount
+
+    if not holdings:
+        return await update.message.reply_text("🎉 No holdings found!")
+
+    # 📊 Format output
+    text = "💼 <b>Current Holdings (Pending Amounts)</b>\n\n"
+    total = 0
+    for i, (escrower, amount) in enumerate(sorted(holdings.items(), key=lambda x: x[1], reverse=True), start=1):
+        text += f"{i}. {escrower} → ₹{amount:.2f}\n"
+        total += amount
+
+    text += f"\n────────────────\n🏦 <b>Total Hold:</b> ₹{total:.2f}"
+
+    await update.message.reply_text(text, parse_mode="HTML")
+
 # ==== MAIN ====
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
@@ -517,6 +549,7 @@ def main():
     app.add_handler(CommandHandler("addadmin", add_admin))
     app.add_handler(CommandHandler("removeadmin", remove_admin))
     app.add_handler(CommandHandler("adminlist", admin_list))
+    application.add_handler(CommandHandler("holding", holding))
 
     print("Bot started... ✅")
     app.run_polling()
