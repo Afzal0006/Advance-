@@ -549,7 +549,7 @@ def main():
     app.add_handler(CommandHandler("addadmin", add_admin))
     app.add_handler(CommandHandler("removeadmin", remove_admin))
     app.add_handler(CommandHandler("adminlist", admin_list))
-    application.add_handler(CommandHandler("holding", holding))
+    app.add_handler(CommandHandler("holding", holding))
 
     print("Bot started... ✅")
     app.run_polling()
