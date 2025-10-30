@@ -476,8 +476,8 @@ async def admin_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = "📋 <b>Admin List</b>\n\n" + "\n".join(owners) + "\n" + admins_text
     await update.message.reply_text(msg, parse_mode="HTML")
 
-# ==== Pending deals (Fixed, top 100) ====
-async def pending_deals(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# ==== ongoing deals (Fixed, top 100) ====
+async def ongoing_deals(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     username = f"@{user.username}" if user.username else user.full_name
     user_check = username.lower().strip()
@@ -487,7 +487,7 @@ async def pending_deals(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not isAdmin:
         return await update.message.reply_text("❌ Only admins can view pending deals!")
 
-    pending_list = []
+    ongoing_list = []
 
     for g in groups_col.find({}):
         deals = g.get("deals") or {}
@@ -496,13 +496,13 @@ async def pending_deals(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 continue
             if deal.get("completed"):
                 continue
-            pending_list.append(deal)
+            ongoing_list.append(deal)
 
-    if not pending_list:
-        return await update.message.reply_text("🎉 No pending deals found!")
+    if not ongoing_list:
+        return await update.message.reply_text("🎉 No ongoing deals found!")
 
-    text = "🔄 <b>Pending Deals (Top 100)</b>\n\n"
-    for i, deal in enumerate(pending_list[:100], start=1):
+    text = "🔄 <b>ongoing Deals (Top 100)</b>\n\n"
+    for i, deal in enumerate(ongoing_list[:100], start=1):
         text += (
             f"{i}. 🆔 #{deal.get('trade_id', 'N/A')} — ₹{deal.get('added_amount', 0)}\n"
             f"👤 Buyer: {deal.get('buyer', 'Unknown')}\n"
@@ -555,7 +555,7 @@ def main():
     app.add_handler(CommandHandler("stats", stats))
     app.add_handler(CommandHandler("gstats", global_stats))
     app.add_handler(CommandHandler("allstats", all_stats))
-    app.add_handler(CommandHandler("pending", pending_deals))
+    app.add_handler(CommandHandler("ongoing", ongoing_deals))
     app.add_handler(CommandHandler("addadmin", add_admin))
     app.add_handler(CommandHandler("removeadmin", remove_admin))
     app.add_handler(CommandHandler("adminlist", admin_list))
