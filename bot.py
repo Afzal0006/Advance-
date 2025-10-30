@@ -544,6 +544,47 @@ async def holding(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(text, parse_mode="HTML")
 
+# ==== My Deals (Simple View) ====
+async def mydeals(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    username = f"@{user.username}" if user.username else user.full_name
+
+    pending_deals = []
+    completed_deals = []
+    total_hold = 0
+
+    for g in groups_col.find({}):
+        for deal in g.get("deals", {}).values():
+            if deal.get("escrower") == username:
+                trade_id = deal.get("trade_id", "Unknown")
+                amount = float(deal.get("added_amount", 0))
+                if deal.get("completed"):
+                    completed_deals.append(f"#{trade_id}")
+                else:
+                    pending_deals.append(f"#{trade_id} → ₹{amount:.2f}")
+                    total_hold += amount
+
+    if not pending_deals and not completed_deals:
+        return await update.message.reply_text("🎉 You have no deals yet!")
+
+    text = "📜 <b>Your Deals Summary</b>\n────────────────\n"
+
+    if pending_deals:
+        text += "<b>🕒 Active Deals:</b>\n"
+        text += "\n".join(pending_deals)
+        text += f"\n💼 <b>Total Holding:</b> ₹{total_hold:.2f}\n"
+    else:
+        text += "🕒 No active deals found.\n"
+
+    if completed_deals:
+        text += "\n────────────────\n"
+        text += f"<b>✅ Completed Deals ({len(completed_deals)}):</b>\n"
+        text += ", ".join(completed_deals)
+    else:
+        text += "\n────────────────\n✅ No completed deals yet."
+
+    await update.message.reply_text(text, parse_mode="HTML")
+
 # ==== MAIN ====
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
@@ -560,6 +601,7 @@ def main():
     app.add_handler(CommandHandler("removeadmin", remove_admin))
     app.add_handler(CommandHandler("adminlist", admin_list))
     app.add_handler(CommandHandler("holding", holding))
+    app.add_handler(CommandHandler("mydeals", mydeals))
 
     print("Bot started... ✅")
     app.run_polling()
