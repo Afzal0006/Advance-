@@ -473,6 +473,10 @@ async def pending_deals(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_check = username.lower().strip()
     isAdmin = await is_admin(update)
 
+    # 🚫 Restrict access
+    if not isAdmin:
+        return await update.message.reply_text("❌ Only admins can view pending deals!")
+
     pending_list = []
 
     for g in groups_col.find({}):
@@ -482,13 +486,7 @@ async def pending_deals(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 continue
             if deal.get("completed"):
                 continue
-
-            buyer = str(deal.get("buyer", "Unknown")).lower().strip()
-            seller = str(deal.get("seller", "Unknown")).lower().strip()
-
-            # Admin sees all, user sees only own deals
-            if isAdmin or (user_check == buyer or user_check == seller):
-                pending_list.append(deal)
+            pending_list.append(deal)
 
     if not pending_list:
         return await update.message.reply_text("🎉 No pending deals found!")
@@ -503,7 +501,6 @@ async def pending_deals(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     await update.message.reply_text(text, parse_mode="HTML")
-
 
 # ==== MAIN ====
 def main():
