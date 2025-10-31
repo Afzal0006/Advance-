@@ -620,39 +620,104 @@ async def mydeals(update, context, page=0):
     text = "📜 <b>Your Deals Summary</b>\n────────────────\n" + "\n".join(text_lines)
     await update.message.reply_text(text, parse_mode="HTML")
 
-# ==== Broadcast Command ====
+import asyncio
+from telegram import Update
+from telegram.ext import ContextTypes
+
 # ==== Broadcast Command ====
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id not in OWNER_IDS:
-        await update.message.reply_text("⛔ You are not allowed to use this command.")
-        return
+        return await update.message.reply_text("⛔ You are not allowed to use this command.")
 
-    if not context.args:
-        await update.message.reply_text("Usage: /broadcast Your message here")
-        return
+    # ✅ Message / Media check
+    if not update.message.reply_to_message and not context.args:
+        return await update.message.reply_text(
+            "Usage:\n"
+            "👉 Reply to a message (photo/text/video) with /broadcast\n"
+            "OR send /broadcast Your message here"
+        )
 
-    msg = " ".join(context.args)
-    await update.message.reply_text("✅ Broadcasting started...")
+    status_msg = await update.message.reply_text("📢 <b>Broadcast started...</b>", parse_mode="HTML")
 
-    total = users_col.count_documents({})
+    reply_msg = update.message.reply_to_message
+    text = " ".join(context.args) if context.args else None
+
     sent, failed = 0, 0
+    targets = []
 
-    for user in users_col.find():
+    # Collect all users and groups
+    if "users_col" in globals():
+        targets += [u["_id"] for u in users_col.find()]
+    if "groups_col" in globals():
+        targets += [g["_id"] for g in groups_col.find()]
+
+    total = len(targets)
+
+    # === Helper Function ===
+    async def send_to(chat_id):
+        nonlocal sent, failed
         try:
-            await context.bot.send_message(chat_id=user["_id"], text=msg)
+            if reply_msg:
+                # --- Photo ---
+                if reply_msg.photo:
+                    await context.bot.send_photo(
+                        chat_id=chat_id,
+                        photo=reply_msg.photo[-1].file_id,
+                        caption=reply_msg.caption or ""
+                    )
+                # --- Video ---
+                elif reply_msg.video:
+                    await context.bot.send_video(
+                        chat_id=chat_id,
+                        video=reply_msg.video.file_id,
+                        caption=reply_msg.caption or ""
+                    )
+                # --- Document ---
+                elif reply_msg.document:
+                    await context.bot.send_document(
+                        chat_id=chat_id,
+                        document=reply_msg.document.file_id,
+                        caption=reply_msg.caption or ""
+                    )
+                # --- Text ---
+                elif reply_msg.text:
+                    await context.bot.send_message(chat_id=chat_id, text=reply_msg.text)
+            else:
+                await context.bot.send_message(chat_id=chat_id, text=text)
             sent += 1
-            await asyncio.sleep(0.1)
         except Exception:
             failed += 1
 
-    report = (
-        "✅ Broadcast completed.\n\n"
+    # === Broadcast Loop ===
+    for i, chat_id in enumerate(targets, start=1):
+        await send_to(chat_id)
+        await asyncio.sleep(0.2)
+
+        # Live update every 10 messages
+        if i % 10 == 0 or i == total:
+            try:
+                percent = (i / total) * 100
+                bar = "█" * int(percent // 10) + "░" * (10 - int(percent // 10))
+                await status_msg.edit_text(
+                    f"📢 <b>Broadcasting...</b>\n"
+                    f"{bar} {percent:.1f}%\n\n"
+                    f"📩 Sent: {sent}\n"
+                    f"❌ Failed: {failed}\n"
+                    f"👥 Total: {total}",
+                    parse_mode="HTML"
+                )
+            except Exception:
+                pass
+
+    # === Final Report ===
+    await status_msg.edit_text(
+        f"✅ <b>Broadcast completed!</b>\n\n"
         f"📩 Sent: {sent}\n"
         f"❌ Failed: {failed}\n"
-        f"👥 Total Saved: {total}"
+        f"👥 Total Targets: {total}",
+        parse_mode="HTML"
     )
-    await update.message.reply_text(report)
    
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
