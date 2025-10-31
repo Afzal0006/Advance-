@@ -718,6 +718,43 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"👥 Total Targets: {total}",
         parse_mode="HTML"
     )
+
+from pyrogram import Client, filters
+
+@Client.on_message(filters.command("botstats", prefixes=["/", "!"]))
+async def bot_stats(client, message):
+    user_id = message.from_user.id
+
+    # ✅ Only Owner allowed (OWNER_IDS is already defined globally)
+    if user_id not in OWNER_IDS:
+        return await message.reply_text("⛔ You are not allowed to use this command.")
+
+    users = 0
+    blocked = 0
+    groups = 0
+
+    # 🧩 Count from MongoDB collections
+    if "users_col" in globals():
+        users = users_col.count_documents({})
+        blocked = users_col.count_documents({"blocked": True})
+
+    if "groups_col" in globals():
+        groups = groups_col.count_documents({})
+
+    total = users + groups
+
+    # 🧾 Final message
+    text = (
+        "📢 <b>Bot Stats</b>\n"
+        "─────────────────────\n"
+        f"🪴 <b>Users:</b> {users}\n"
+        f"❌ <b>Blocked:</b> {blocked}\n"
+        f"🏘️ <b>Groups:</b> {groups}\n"
+        "─────────────────────\n"
+        f"👥 <b>Total:</b> {total}"
+    )
+
+    await message.reply_text(text, parse_mode="HTML")
    
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
@@ -736,6 +773,7 @@ def main():
     app.add_handler(CommandHandler("holding", holding))
     app.add_handler(CommandHandler("mydeals", mydeals))
     app.add_handler(CommandHandler("broadcast", broadcast))
+    app.add_handler(CommandHandler("botstats", botstats))
 
     print("Bot started... ✅")
     app.run_polling()
