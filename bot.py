@@ -621,36 +621,39 @@ async def mydeals(update, context, page=0):
     await update.message.reply_text(text, parse_mode="HTML")
 
 # ==== Broadcast Command ====
-from telegram.error import Forbidden, BadRequest
-
+# ==== Broadcast Command ====
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    if user.id not in OWNER_IDS:
-        return await update.message.reply_text("❌ Only bot owner can use this command!")
+    user_id = update.effective_user.id
+    if user_id not in OWNER_IDS:
+        await update.message.reply_text("⛔ You are not allowed to use this command.")
+        return
 
     if not context.args:
-        return await update.message.reply_text("📢 Usage: /broadcast <message>")
+        await update.message.reply_text("Usage: /broadcast Your message here")
+        return
 
     msg = " ".join(context.args)
-    success = 0
-    failed = 0
+    await update.message.reply_text("✅ Broadcasting started...")
 
-    # ✅ Groups
-    for g in groups_col.find({}):
+    total = users_col.count_documents({})
+    sent, failed = 0, 0
+
+    for user in users_col.find():
         try:
-            await context.bot.send_message(g["_id"], msg)
-            success += 1
-            await asyncio.sleep(0.2)
-        except (Forbidden, BadRequest):
+            await context.bot.send_message(chat_id=user["_id"], text=msg)
+            sent += 1
+            await asyncio.sleep(0.1)
+        except Exception:
             failed += 1
-            continue
 
-    await update.message.reply_text(
-        f"✅ Broadcast completed!\n"
-        f"📨 Sent: {success}\n"
-        f"❌ Failed: {failed}"
+    report = (
+        "✅ Broadcast completed.\n\n"
+        f"📩 Sent: {sent}\n"
+        f"❌ Failed: {failed}\n"
+        f"👥 Total Saved: {total}"
     )
-    
+    await update.message.reply_text(report)
+   
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
