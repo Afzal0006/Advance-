@@ -719,21 +719,22 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="HTML"
     )
 
-from pyrogram import Client, filters
+from telegram import Update
+from telegram.ext import CommandHandler, ContextTypes
 
-@Client.on_message(filters.command("botstats", prefixes=["/", "!"]))
-async def bot_stats(client, message):
-    user_id = message.from_user.id
+# ==== /botstats ====
+async def botstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
 
-    # ✅ Only Owner allowed (OWNER_IDS is already defined globally)
+    # ✅ Only owners can use this
     if user_id not in OWNER_IDS:
-        return await message.reply_text("⛔ You are not allowed to use this command.")
+        return await update.message.reply_text("⛔ Only owner can use this command!")
 
     users = 0
     blocked = 0
     groups = 0
 
-    # 🧩 Count from MongoDB collections
+    # MongoDB se count
     if "users_col" in globals():
         users = users_col.count_documents({})
         blocked = users_col.count_documents({"blocked": True})
@@ -743,8 +744,7 @@ async def bot_stats(client, message):
 
     total = users + groups
 
-    # 🧾 Final message
-    text = (
+    msg = (
         "📢 <b>Bot Stats</b>\n"
         "─────────────────────\n"
         f"🪴 <b>Users:</b> {users}\n"
@@ -754,7 +754,7 @@ async def bot_stats(client, message):
         f"👥 <b>Total:</b> {total}"
     )
 
-    await message.reply_text(text, parse_mode="HTML")
+    await update.message.reply_text(msg, parse_mode="HTML")
    
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
