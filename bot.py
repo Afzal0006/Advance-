@@ -619,6 +619,38 @@ async def mydeals(update, context, page=0):
 
     text = "📜 <b>Your Deals Summary</b>\n────────────────\n" + "\n".join(text_lines)
     await update.message.reply_text(text, parse_mode="HTML")
+
+# ==== Broadcast Command ====
+from telegram.error import Forbidden, BadRequest
+
+async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if user.id not in OWNER_IDS:
+        return await update.message.reply_text("❌ Only bot owner can use this command!")
+
+    if not context.args:
+        return await update.message.reply_text("📢 Usage: /broadcast <message>")
+
+    msg = " ".join(context.args)
+    success = 0
+    failed = 0
+
+    # ✅ Groups
+    for g in groups_col.find({}):
+        try:
+            await context.bot.send_message(g["_id"], msg)
+            success += 1
+            await asyncio.sleep(0.2)
+        except (Forbidden, BadRequest):
+            failed += 1
+            continue
+
+    await update.message.reply_text(
+        f"✅ Broadcast completed!\n"
+        f"📨 Sent: {success}\n"
+        f"❌ Failed: {failed}"
+    )
+    
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
@@ -635,6 +667,7 @@ def main():
     app.add_handler(CommandHandler("adminlist", admin_list))
     app.add_handler(CommandHandler("holding", holding))
     app.add_handler(CommandHandler("mydeals", mydeals))
+    app.add_handler(CommandHandler("broadcast", broadcast))
 
     print("Bot started... ✅")
     app.run_polling()
