@@ -80,8 +80,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(msg, parse_mode="HTML")
 
+from datetime import datetime
+import random, re
+from telegram import Update
+from telegram.ext import ContextTypes
+
 # ==== Add deal ====
 async def add_deal(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # ✅ Sirf admin hi use kar sake
     if not await is_admin(update):
         return
     try:
@@ -89,9 +95,11 @@ async def add_deal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except:
         pass
 
+    # ✅ Reply check
     if not update.message.reply_to_message:
         return await update.message.reply_text("❌ Reply to the DEAL INFO message!")
 
+    # ✅ Amount check
     if not context.args or not context.args[0].replace(".", "", 1).isdigit():
         return await update.message.reply_text("❌ Please provide amount like /add 50")
 
@@ -101,33 +109,49 @@ async def add_deal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_id = str(update.message.reply_to_message.message_id)
     init_group(chat_id)
 
+    # ✅ Buyer & Seller find
     buyer_match = re.search(r"BUYER\s*:\s*(@\w+)", original_text, re.IGNORECASE)
     seller_match = re.search(r"SELLER\s*:\s*(@\w+)", original_text, re.IGNORECASE)
 
     buyer = buyer_match.group(1).strip() if buyer_match else "Unknown"
     seller = seller_match.group(1).strip() if seller_match else "Unknown"
 
+    # ✅ Group DB update
     g = groups_col.find_one({"_id": chat_id})
-    deals = g["deals"]
+    deals = g.get("deals", {})
 
     escrower = extract_username_from_user(update.effective_user)
     trade_id = f"TID{random.randint(100000, 999999)}"
 
-    # ✅ Added "escrower" field
+    # ✅ Save deal in group collection
     deals[reply_id] = {
         "trade_id": trade_id,
         "added_amount": amount,
         "completed": False,
         "buyer": buyer,
         "seller": seller,
-        "escrower": escrower
+        "escrower": escrower,
+        "timestamp": datetime.now().isoformat()
     }
+    groups_col.update_one({"_id": chat_id}, {"$set": {"deals": deals}}, upsert=True)
 
-    g["deals"] = deals
-    groups_col.update_one({"_id": chat_id}, {"$set": g})
-
+    # ✅ Escrower stats update
     update_escrower_stats(chat_id, escrower, amount)
 
+    # ✅ Save globally (for /export etc.)
+    if "deals_col" in globals():
+        deals_col.insert_one({
+            "trade_id": trade_id,
+            "buyer": buyer,
+            "seller": seller,
+            "escrower": escrower,
+            "amount": amount,
+            "completed": False,
+            "group_id": chat_id,
+            "timestamp": datetime.now()
+        })
+
+    # ✅ Message format
     msg = (
         f"✅ <b>Amount Received!</b>\n"
         "────────────────\n"
@@ -144,6 +168,7 @@ async def add_deal(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_to_message_id=update.message.reply_to_message.message_id,
         parse_mode="HTML"
     )
+
 # ==== Complete deal (reply-based) ====
 async def complete_deal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin(update):
