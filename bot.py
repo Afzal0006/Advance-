@@ -87,7 +87,6 @@ from telegram.ext import ContextTypes
 
 # ==== Add deal ====
 async def add_deal(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # ✅ Sirf admin hi use kar sake
     if not await is_admin(update):
         return
     try:
@@ -95,11 +94,9 @@ async def add_deal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except:
         pass
 
-    # ✅ Reply check
     if not update.message.reply_to_message:
         return await update.message.reply_text("❌ Reply to the DEAL INFO message!")
 
-    # ✅ Amount check
     if not context.args or not context.args[0].replace(".", "", 1).isdigit():
         return await update.message.reply_text("❌ Please provide amount like /add 50")
 
@@ -109,49 +106,33 @@ async def add_deal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_id = str(update.message.reply_to_message.message_id)
     init_group(chat_id)
 
-    # ✅ Buyer & Seller find
     buyer_match = re.search(r"BUYER\s*:\s*(@\w+)", original_text, re.IGNORECASE)
     seller_match = re.search(r"SELLER\s*:\s*(@\w+)", original_text, re.IGNORECASE)
 
     buyer = buyer_match.group(1).strip() if buyer_match else "Unknown"
     seller = seller_match.group(1).strip() if seller_match else "Unknown"
 
-    # ✅ Group DB update
     g = groups_col.find_one({"_id": chat_id})
-    deals = g.get("deals", {})
+    deals = g["deals"]
 
     escrower = extract_username_from_user(update.effective_user)
     trade_id = f"TID{random.randint(100000, 999999)}"
 
-    # ✅ Save deal in group collection
+    # ✅ Added "escrower" field
     deals[reply_id] = {
         "trade_id": trade_id,
         "added_amount": amount,
         "completed": False,
         "buyer": buyer,
         "seller": seller,
-        "escrower": escrower,
-        "timestamp": datetime.now().isoformat()
+        "escrower": escrower
     }
-    groups_col.update_one({"_id": chat_id}, {"$set": {"deals": deals}}, upsert=True)
 
-    # ✅ Escrower stats update
+    g["deals"] = deals
+    groups_col.update_one({"_id": chat_id}, {"$set": g})
+
     update_escrower_stats(chat_id, escrower, amount)
 
-    # ✅ Save globally (for /export etc.)
-    if "deals_col" in globals():
-        deals_col.insert_one({
-            "trade_id": trade_id,
-            "buyer": buyer,
-            "seller": seller,
-            "escrower": escrower,
-            "amount": amount,
-            "completed": False,
-            "group_id": chat_id,
-            "timestamp": datetime.now()
-        })
-
-    # ✅ Message format
     msg = (
         f"✅ <b>Amount Received!</b>\n"
         "────────────────\n"
@@ -168,6 +149,7 @@ async def add_deal(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_to_message_id=update.message.reply_to_message.message_id,
         parse_mode="HTML"
     )
+
 
 # ==== Complete deal (reply-based) ====
 async def complete_deal(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -645,101 +627,6 @@ async def mydeals(update, context, page=0):
     text = "📜 <b>Your Deals Summary</b>\n────────────────\n" + "\n".join(text_lines)
     await update.message.reply_text(text, parse_mode="HTML")
 
-from telegram import Update, InputFile
-from telegram.ext import ContextTypes
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
-from reportlab.lib.pagesizes import A4
-from reportlab.lib import colors
-from reportlab.lib.styles import getSampleStyleSheet
-import io
-
-# ==== /export ====
-async def export_deals(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    user_id = user.id
-
-    # ✅ Only owners allowed
-    if user_id not in OWNER_IDS:
-        return await update.message.reply_text("⛔ Only owner can use this command!")
-
-    # ✅ Check if username argument is given
-    if not context.args:
-        return await update.message.reply_text("Usage: /export @username")
-
-    username = context.args[0].replace("@", "").strip()
-
-    # ==== Collect all deals from groups ====
-    all_deals = []
-    for g in groups_col.find({}):
-        for deal in g.get("deals", []):
-            # 🧩 Ignore invalid data (string or non-dict)
-            if not isinstance(deal, dict):
-                continue
-
-            # 🧩 Match username with buyer/seller/escrower
-            if username.lower() in [
-                str(deal.get("buyer", "")).replace("@", "").lower(),
-                str(deal.get("seller", "")).replace("@", "").lower(),
-                str(deal.get("escrower", "")).replace("@", "").lower(),
-            ]:
-                all_deals.append(deal)
-
-    # ✅ No deals found
-    if not all_deals:
-        return await update.message.reply_text(f"❌ No deals found for @{username}")
-
-    # ==== Create PDF Report ====
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4)
-    elements = []
-
-    styles = getSampleStyleSheet()
-    title = Paragraph(f"<b>Deal Report for @{username}</b>", styles["Title"])
-    elements.append(title)
-
-    # Table Header
-    data = [["Trade ID", "Buyer", "Seller", "Escrower", "Amount", "Fee", "Status", "Date"]]
-
-    # Table Rows
-    for d in all_deals:
-        data.append([
-            d.get("trade_id", ""),
-            d.get("buyer", ""),
-            d.get("seller", ""),
-            d.get("escrower", ""),
-            f"₹{d.get('amount', '')}",
-            f"₹{d.get('fee', '')}",
-            d.get("status", ""),
-            str(d.get("date", ""))[:10] if d.get("date") else "",
-        ])
-
-    # Style the table
-    table = Table(data, repeatRows=1)
-    table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.whitesmoke, colors.lightgrey])
-    ]))
-
-    elements.append(table)
-
-    # Generate PDF
-    doc.build(elements)
-    buffer.seek(0)
-
-    filename = f"deal_report_{username}.pdf"
-
-    await update.message.reply_document(
-        document=InputFile(buffer, filename=filename),
-        caption=f"📦 Deal Report for @{username}"
-    )
-
-    buffer.close()
-   
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
@@ -756,7 +643,6 @@ def main():
     app.add_handler(CommandHandler("adminlist", admin_list))
     app.add_handler(CommandHandler("holding", holding))
     app.add_handler(CommandHandler("mydeals", mydeals))
-    app.add_handler(CommandHandler("export", export_deals))
 
     print("Bot started... ✅")
     app.run_polling()
