@@ -152,6 +152,8 @@ async def add_deal(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ==== Complete deal (reply-based) ====
+from datetime import datetime
+
 async def complete_deal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin(update):
         return
@@ -176,7 +178,10 @@ async def complete_deal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if deal_info["completed"]:
         return await update.message.reply_text("⚠️ Already completed!")
 
+    # ✅ Mark deal completed and add timestamp
     deal_info["completed"] = True
+    deal_info["completed_at"] = datetime.utcnow().isoformat()  # ✅ added line
+
     g["deals"][reply_id] = deal_info
 
     added_amount = deal_info["added_amount"]
@@ -205,9 +210,13 @@ async def complete_deal(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "────────────────\n"
         f"🛡️ Escrowed by {escrower}"
     )
-    await update.effective_chat.send_message(msg, reply_to_message_id=update.message.reply_to_message.message_id, parse_mode="HTML")
+    await update.effective_chat.send_message(
+        msg,
+        reply_to_message_id=update.message.reply_to_message.message_id,
+        parse_mode="HTML"
+    )
 
-    # Log
+    # 📜 Log message
     try:
         log_msg = (
             "📜 <b>Deal Completed (Log)</b>\n"
@@ -218,6 +227,7 @@ async def complete_deal(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"🆔 Trade ID: #{trade_id}\n"
             f"💰 Fee     : ₹{fee}\n"
             f"🛡️ Escrowed by {escrower}\n"
+            f"📆 Date: {datetime.utcnow().strftime('%d %b %Y, %H:%M UTC')}\n"
             f"📌 Group: {update.effective_chat.title} ({update.effective_chat.id})"
         )
         await context.bot.send_message(LOG_CHANNEL_ID, log_msg, parse_mode="HTML")
