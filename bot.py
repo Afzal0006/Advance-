@@ -506,7 +506,7 @@ async def ongoing_deals(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ongoing_list.append(deal)
 
     if not ongoing_list:
-        return await update.message.reply_text("🎉 No ongoing deals found!")
+        return await update.message.reply_text("📊 There are currently no ongoing deals.")
 
     text = "🔄 <b>ongoing Deals (Top 100)</b>\n\n"
     for i, deal in enumerate(ongoing_list[:100], start=1):
@@ -538,7 +538,8 @@ async def holding(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 holdings[escrower] = holdings.get(escrower, 0) + amount
 
     if not holdings:
-        return await update.message.reply_text("🎉 No holdings found!")
+        return await update.message.reply_text("🌱 No holding amounts right now!
+        ")
 
     # 📊 Format output
     text = "💼 <b>Current Holdings (Pending Amounts)</b>\n\n"
