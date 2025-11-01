@@ -621,44 +621,49 @@ async def mydeals(update, context, page=0):
     await update.message.reply_text(text, parse_mode="HTML")
 
 from telegram import Update, InputFile
-from telegram.ext import CommandHandler, ContextTypes
+from telegram.ext import ContextTypes
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
 import io
-import datetime
 
 # ==== /export ====
 async def export_deals(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     user_id = user.id
 
-    # ✅ Only owners & admins
+    # ✅ Only owners allowed
     if user_id not in OWNER_IDS:
         return await update.message.reply_text("⛔ Only owner can use this command!")
 
-    # Username argument check
+    # ✅ Check if username argument is given
     if not context.args:
         return await update.message.reply_text("Usage: /export @username")
 
     username = context.args[0].replace("@", "").strip()
 
-    # MongoDB se data collect
+    # ==== Collect all deals from groups ====
     all_deals = []
     for g in groups_col.find({}):
         for deal in g.get("deals", []):
+            # 🧩 Ignore invalid data (string or non-dict)
+            if not isinstance(deal, dict):
+                continue
+
+            # 🧩 Match username with buyer/seller/escrower
             if username.lower() in [
-                deal.get("buyer", "").replace("@", "").lower(),
-                deal.get("seller", "").replace("@", "").lower(),
-                deal.get("escrower", "").replace("@", "").lower(),
+                str(deal.get("buyer", "")).replace("@", "").lower(),
+                str(deal.get("seller", "")).replace("@", "").lower(),
+                str(deal.get("escrower", "")).replace("@", "").lower(),
             ]:
                 all_deals.append(deal)
 
+    # ✅ No deals found
     if not all_deals:
         return await update.message.reply_text(f"❌ No deals found for @{username}")
 
-    # ==== Create PDF ====
+    # ==== Create PDF Report ====
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4)
     elements = []
@@ -667,20 +672,23 @@ async def export_deals(update: Update, context: ContextTypes.DEFAULT_TYPE):
     title = Paragraph(f"<b>Deal Report for @{username}</b>", styles["Title"])
     elements.append(title)
 
+    # Table Header
     data = [["Trade ID", "Buyer", "Seller", "Escrower", "Amount", "Fee", "Status", "Date"]]
 
+    # Table Rows
     for d in all_deals:
         data.append([
             d.get("trade_id", ""),
             d.get("buyer", ""),
             d.get("seller", ""),
             d.get("escrower", ""),
-            str(d.get("amount", "")),
-            str(d.get("fee", "")),
+            f"₹{d.get('amount', '')}",
+            f"₹{d.get('fee', '')}",
             d.get("status", ""),
-            str(d.get("date", ""))[:10]
+            str(d.get("date", ""))[:10] if d.get("date") else "",
         ])
 
+    # Style the table
     table = Table(data, repeatRows=1)
     table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue),
@@ -689,16 +697,21 @@ async def export_deals(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.whitesmoke, colors.lightgrey])
     ]))
 
     elements.append(table)
 
+    # Generate PDF
     doc.build(elements)
     buffer.seek(0)
 
     filename = f"deal_report_{username}.pdf"
-    await update.message.reply_document(document=InputFile(buffer, filename=filename),
-                                        caption=f"📦 Deal Report for @{username}")
+
+    await update.message.reply_document(
+        document=InputFile(buffer, filename=filename),
+        caption=f"📦 Deal Report for @{username}"
+    )
 
     buffer.close()
    
