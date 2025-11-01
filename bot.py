@@ -538,8 +538,7 @@ async def holding(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 holdings[escrower] = holdings.get(escrower, 0) + amount
 
     if not holdings:
-        return await update.message.reply_text("🌱 No holding amounts right now!
-        ")
+        return await update.message.reply_text("🌱 No holding amounts right now!")
 
     # 📊 Format output
     text = "💼 <b>Current Holdings (Pending Amounts)</b>\n\n"
