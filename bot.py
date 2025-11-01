@@ -638,14 +638,10 @@ async def mydeals(update, context, page=0):
     await update.message.reply_text(text, parse_mode="HTML")
 
 from datetime import datetime, timedelta
-from telegram import Update
-from telegram.ext import ContextTypes
 
-# ==== DAILY SUMMARY ====
+# ==== Daily Summary ====
 async def daily(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    isAdmin = await is_admin(update)
-    if not isAdmin:
+    if not await is_admin(update):
         return await update.message.reply_text("❌ Only admins can use this command!")
 
     today = datetime.utcnow().date()
@@ -658,39 +654,51 @@ async def daily(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     for g in groups_col.find({}):
         for deal in g.get("deals", {}).values():
-            completed_at = deal.get("completed_at")
-            if completed_at:
-                dt = datetime.fromisoformat(completed_at)
-                if start <= dt <= end:
-                    total_deals += 1
-                    total_volume += float(deal.get("amount", 0))
-                    total_fee += float(deal.get("fee", 0))
+            if not deal or not deal.get("completed"):
+                continue
+
+            dt = deal.get("completed_at")
+            if not dt:
+                continue
+
+            # Convert to datetime if it's a string
+            if isinstance(dt, str):
+                try:
+                    dt = datetime.fromisoformat(dt)
+                except:
+                    continue
+
+            if start <= dt <= end:
+                total_deals += 1
+                total_volume += float(deal.get("added_amount", 0))  # ✅ fixed key
+                total_fee += float(deal.get("fee", 0))
 
     if total_deals == 0:
         return await update.message.reply_text("📅 No deals completed today!")
 
-    text = (
+    date_str = today.strftime("%d %b %Y")
+
+    msg = (
         f"📅 <b>Today's Summary</b>\n"
-        f"────────────────\n"
-        f"📊 <b>Deals:</b> {total_deals}\n"
-        f"💰 <b>Volume:</b> ₹{total_volume:,.0f}\n"
-        f"💵 <b>Total Fee:</b> ₹{total_fee:,.0f}\n"
-        f"🗓 <b>Date:</b> {today.strftime('%d %b %Y')}"
+        "────────────────\n"
+        f"📊 Deals: {total_deals}\n"
+        f"💰 Volume: ₹{total_volume}\n"
+        f"💵 Total Fee: ₹{total_fee}\n"
+        f"🗓 Date: {date_str}"
     )
-    await update.message.reply_text(text, parse_mode="HTML")
+    await update.message.reply_text(msg, parse_mode="HTML")
 
 
-# ==== WEEKLY SUMMARY ====
+# ==== Weekly Summary ====
 async def week(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    isAdmin = await is_admin(update)
-    if not isAdmin:
+    if not await is_admin(update):
         return await update.message.reply_text("❌ Only admins can use this command!")
 
     today = datetime.utcnow().date()
-    start_date = today - timedelta(days=6)  # last 7 days including today
-    start = datetime.combine(start_date, datetime.min.time())
-    end = datetime.combine(today, datetime.max.time())
+    start_of_week = today - timedelta(days=today.weekday())
+    end_of_week = start_of_week + timedelta(days=6)
+    start = datetime.combine(start_of_week, datetime.min.time())
+    end = datetime.combine(end_of_week, datetime.max.time())
 
     total_deals = 0
     total_volume = 0.0
@@ -698,27 +706,36 @@ async def week(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     for g in groups_col.find({}):
         for deal in g.get("deals", {}).values():
-            completed_at = deal.get("completed_at")
-            if completed_at:
-                dt = datetime.fromisoformat(completed_at)
-                if start <= dt <= end:
-                    total_deals += 1
-                    total_volume += float(deal.get("amount", 0))
-                    total_fee += float(deal.get("fee", 0))
+            if not deal or not deal.get("completed"):
+                continue
+
+            dt = deal.get("completed_at")
+            if not dt:
+                continue
+
+            if isinstance(dt, str):
+                try:
+                    dt = datetime.fromisoformat(dt)
+                except:
+                    continue
+
+            if start <= dt <= end:
+                total_deals += 1
+                total_volume += float(deal.get("added_amount", 0))  # ✅ fixed key
+                total_fee += float(deal.get("fee", 0))
 
     if total_deals == 0:
         return await update.message.reply_text("📅 No deals completed this week!")
 
-    text = (
-        f"📅 <b>Weekly Summary</b>\n"
-        f"────────────────\n"
-        f"📊 <b>Deals:</b> {total_deals}\n"
-        f"💰 <b>Volume:</b> ₹{total_volume:,.0f}\n"
-        f"💵 <b>Total Fee:</b> ₹{total_fee:,.0f}\n"
-        f"📆 <b>Week Range:</b> {start_date.strftime('%d %b')} – {today.strftime('%d %b %Y')}"
+    msg = (
+        f"🗓 <b>Weekly Summary</b>\n"
+        "────────────────\n"
+        f"📊 Deals: {total_deals}\n"
+        f"💰 Volume: ₹{total_volume}\n"
+        f"💵 Total Fee: ₹{total_fee}\n"
+        f"📅 Week: {start_of_week.strftime('%d %b')} - {end_of_week.strftime('%d %b %Y')}"
     )
-    await update.message.reply_text(text, parse_mode="HTML")
-
+    await update.message.reply_text(msg, parse_mode="HTML")
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
