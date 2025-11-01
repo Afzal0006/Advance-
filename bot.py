@@ -425,34 +425,37 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"💳 Highest Deal: ₹{highest_deal:.1f}"
     ]
 
-    # === Generate notebook-style image ===
+    # === Generate clean white-page image ===
     width, height = 800, 500
-    bg_color = (247, 250, 255)
-    line_color = (190, 220, 255)
-    font_color = (0, 0, 0)
+    bg_color = (255, 255, 255)   # white background
+    font_color = (0, 0, 0)       # black text
 
     img = Image.new("RGB", (width, height), bg_color)
     draw = ImageDraw.Draw(img)
 
-    # Draw notebook lines
-    for y in range(40, height, 40):
-        draw.line([(0, y), (width, y)], fill=line_color, width=2)
+    # Optional: light border / shadow for professional look
+    border_color = (220, 220, 220)
+    draw.rectangle([(10, 10), (width - 10, height - 10)], outline=border_color, width=3)
 
     # Add text
     try:
         font = ImageFont.truetype("arial.ttf", 28)
-        title_font = ImageFont.truetype("arialbd.ttf", 32)
+        title_font = ImageFont.truetype("arialbd.ttf", 34)
     except:
         font = ImageFont.load_default()
         title_font = font
 
-    y_text = 40
+    y_text = 60
     for i, line in enumerate(lines):
         if i == 0:
-            draw.text((40, y_text), line, font=title_font, fill=font_color)
+            draw.text((50, y_text), line, font=title_font, fill=font_color)
         else:
-            draw.text((60, y_text + 10), line, font=font, fill=font_color)
+            draw.text((70, y_text + 10), line, font=font, fill=font_color)
         y_text += 50
+
+    # Footer
+    date_str = datetime.utcnow().strftime("%d %b %Y, %H:%M UTC")
+    draw.text((50, height - 60), f"📅 Generated on {date_str}", font=font, fill=(120, 120, 120))
 
     # === Save image to memory ===
     bio = io.BytesIO()
