@@ -439,8 +439,8 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Add text
     try:
-        font = ImageFont.truetype("arial.ttf", 28)
-        title_font = ImageFont.truetype("arialbd.ttf", 34)
+        font = ImageFont.truetype("arial.ttf", 56)
+        title_font = ImageFont.truetype("arialbd.ttf", 68)
     except:
         font = ImageFont.load_default()
         title_font = font
