@@ -426,7 +426,7 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
 
     # === Generate clean white-page image ===
-    width, height = 800, 500
+    width, height = 40, 400
     bg_color = (255, 255, 255)   # white background
     font_color = (0, 0, 0)       # black text
 
