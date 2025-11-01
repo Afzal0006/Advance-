@@ -366,6 +366,12 @@ async def global_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(msg)
 
+from PIL import Image, ImageDraw, ImageFont
+import io
+from datetime import datetime
+from telegram import Update
+from telegram.ext import ContextTypes
+
 # ==== Personal stats ====
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -378,13 +384,14 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     highest_deal = 0
     all_users = {}
 
+    # === Collect data from all groups ===
     for g in groups_col.find({}):
         for deal in g.get("deals", {}).values():
             if not deal:
                 continue
             buyer = str(deal.get("buyer", "")).lower().strip()
             seller = str(deal.get("seller", "")).lower().strip()
-            amount = deal.get("added_amount", 0)
+            amount = float(deal.get("added_amount", 0))
             completed = deal.get("completed", False)
 
             if user_check == buyer or user_check == seller:
@@ -403,18 +410,57 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if total_deals == 0:
         return await update.message.reply_text("📊 No deals found for you.")
 
+    # === Rank Calculation ===
     sorted_users = sorted(all_users.items(), key=lambda x: x[1]["volume"], reverse=True)
     rank = next((i + 1 for i, (u, _) in enumerate(sorted_users) if u == user_check), "N/A")
 
-    msg = (
-        f"📊 <b>Participant Stats for {username}</b>\n\n"
-        f"👑 Ranking: {rank}\n"
-        f"📈 Total Volume: ₹{total_volume}\n"
-        f"🧳 Total Deals: {total_deals}\n"
-        f"🧿 Ongoing Deals: {ongoing_deals}\n"
-        f"💳 Highest Deal - ₹{highest_deal}"
-    )
-    await update.message.reply_text(msg, parse_mode="HTML")
+    # === Text to Display ===
+    lines = [
+        f"📊 Participant Stats for {username}",
+        "",
+        f"👑 Ranking: {rank}",
+        f"📈 Total Volume: ₹{total_volume:.1f}",
+        f"🧳 Total Deals: {total_deals}",
+        f"🧿 Ongoing Deals: {ongoing_deals}",
+        f"💳 Highest Deal: ₹{highest_deal:.1f}"
+    ]
+
+    # === Generate notebook-style image ===
+    width, height = 800, 500
+    bg_color = (247, 250, 255)
+    line_color = (190, 220, 255)
+    font_color = (0, 0, 0)
+
+    img = Image.new("RGB", (width, height), bg_color)
+    draw = ImageDraw.Draw(img)
+
+    # Draw notebook lines
+    for y in range(40, height, 40):
+        draw.line([(0, y), (width, y)], fill=line_color, width=2)
+
+    # Add text
+    try:
+        font = ImageFont.truetype("arial.ttf", 28)
+        title_font = ImageFont.truetype("arialbd.ttf", 32)
+    except:
+        font = ImageFont.load_default()
+        title_font = font
+
+    y_text = 40
+    for i, line in enumerate(lines):
+        if i == 0:
+            draw.text((40, y_text), line, font=title_font, fill=font_color)
+        else:
+            draw.text((60, y_text + 10), line, font=font, fill=font_color)
+        y_text += 50
+
+    # === Save image to memory ===
+    bio = io.BytesIO()
+    img.save(bio, "PNG")
+    bio.seek(0)
+
+    # === Send photo ===
+    await update.message.reply_photo(photo=bio, caption="📋 Your Escrow Stats Summary")
 
 # ==== All stats (Top users) ====
 async def all_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
