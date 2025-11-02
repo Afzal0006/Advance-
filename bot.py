@@ -419,10 +419,10 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"📊 Participant Stats for {username}",
         "",
         f"•  Ranking: {rank}",
-        f"•  Total Volume:  {total_volume:.1f} inr",
-        f"•  Total Deals:  {total_deals}",
-        f"•  Ongoing Deals:  {ongoing_deals}",
-        f"•  Highest Deal:  {highest_deal:.1f} inr"
+        f"•  Total Volume :  {total_volume:.1f} inr",
+        f"•  Total Deals :  {total_deals}",
+        f"•  Ongoing Deals :  {ongoing_deals}",
+        f"•  Highest Deal :  {highest_deal:.1f} inr"
     ]
 
     # === Generate clean white-page image ===
@@ -439,8 +439,8 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Add text
     try:
-        font = ImageFont.truetype("arial.ttf", 70)
-        title_font = ImageFont.truetype("arialbd.ttf", 48)
+        font = ImageFont.truetype("arial.ttf", 140)
+        title_font = ImageFont.truetype("arialbd.ttf", 98)
     except:
         font = ImageFont.load_default()
         title_font = font
