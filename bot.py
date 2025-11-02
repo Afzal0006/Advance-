@@ -473,8 +473,12 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_photo(photo=bio, caption="📋 Your Escrow Stats Summary")
 
-# ==== All stats (Top users) ====
-async def all_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+from PIL import Image, ImageDraw, ImageFont
+import io
+from datetime import datetime
+
+# === Top Users (Image Output by Volume) ===
+async def topuser(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin(update):
         return await update.message.reply_text("❌ Only admins can use this command!")
 
@@ -485,34 +489,55 @@ async def all_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 continue
             for user_key in ["buyer", "seller"]:
                 user = str(deal.get(user_key, "")).strip()
-                amount = deal.get("added_amount", 0)
+                amount = float(deal.get("added_amount", 0))
                 if user.startswith("@"):
-                    if user not in users_data:
-                        users_data[user] = {"deals": 0, "volume": 0, "highest": 0}
-                    users_data[user]["deals"] += 1
-                    users_data[user]["volume"] += amount
-                    users_data[user]["highest"] = max(users_data[user]["highest"], amount)
+                    users_data.setdefault(user, 0)
+                    users_data[user] += amount
 
     if not users_data:
         return await update.message.reply_text("📊 No deals found.")
 
-    sorted_users = sorted(users_data.items(), key=lambda x: x[1]["volume"], reverse=True)
-    ranking_text = "🏆 <b>Top 5 Traders (by Volume)</b>\n\n"
-    for i, (user, stats) in enumerate(sorted_users[:5], start=1):
-        ranking_text += f"{i}. {user} → ₹{stats['volume']} ({stats['deals']} deals)\n"
+    # Sort by volume (descending)
+    sorted_users = sorted(users_data.items(), key=lambda x: x[1], reverse=True)[:10]
 
-    msg_parts = []
-    for user, stats in sorted_users:
-        msg_parts.append(
-            f"👤 User: {user}\n"
-            f"💰 Total Volume: ₹{stats['volume']}\n"
-            f"🔹 Total Deals: {stats['deals']}\n"
-            f"🏆 Highest Deal: ₹{stats['highest']}\n"
-            "────────────────"
-        )
+    # === Create Image ===
+    width, height = 900, 800
+    bg_color = (255, 255, 255)
+    text_color = (0, 0, 0)
 
-    msg = "📊 <b>All Users Stats</b>\n\n" + ranking_text + "\n" + "\n".join(msg_parts)
-    await update.message.reply_text(msg, parse_mode="HTML")
+    img = Image.new("RGB", (width, height), bg_color)
+    draw = ImageDraw.Draw(img)
+
+    # Border
+    draw.rectangle([(10, 10), (width - 10, height - 10)], outline=(0, 0, 0), width=5)
+
+    # Fonts
+    try:
+        title_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 90)
+        font = ImageFont.truetype("DejaVuSans.ttf", 65)
+    except:
+        title_font = ImageFont.load_default()
+        font = ImageFont.load_default()
+
+    # Title
+    draw.text((width // 2 - 260, 50), "🏆 Top 10 Traders", font=title_font, fill=text_color)
+
+    # User Stats
+    y = 200
+    for i, (user, volume) in enumerate(sorted_users, start=1):
+        line = f"{i}. {user} — ₹{volume:.1f}"
+        draw.text((100, y), line, font=font, fill=text_color)
+        y += 70
+
+    # Footer (IST time)
+    date_str = datetime.now().strftime("%d %b %Y, %I:%M %p") + " IST"
+    draw.text((50, height - 70), f"📅 Generated on {date_str}", font=font, fill=(100, 100, 100))
+
+    # Save & send
+    bio = io.BytesIO()
+    img.save(bio, "PNG")
+    bio.seek(0)
+    await update.message.reply_photo(photo=bio, caption="📊 Top 10 Traders (by Volume)")
 
 # ==== Admin commands ====
 async def add_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -806,7 +831,7 @@ def main():
     app.add_handler(CommandHandler("status", deal_status))
     app.add_handler(CommandHandler("stats", stats))
     app.add_handler(CommandHandler("gstats", global_stats))
-    app.add_handler(CommandHandler("allstats", all_stats))
+    app.add_handler(CommandHandler("topuser", topuser))
     app.add_handler(CommandHandler("ongoing", ongoing_deals))
     app.add_handler(CommandHandler("addadmin", add_admin))
     app.add_handler(CommandHandler("removeadmin", remove_admin))
