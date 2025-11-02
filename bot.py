@@ -513,8 +513,8 @@ async def topuser(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Fonts
     try:
-        title_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 90)
-        font = ImageFont.truetype("DejaVuSans.ttf", 65)
+        title_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 50)
+        font = ImageFont.truetype("DejaVuSans.ttf", 45)
     except:
         title_font = ImageFont.load_default()
         font = ImageFont.load_default()
@@ -523,11 +523,11 @@ async def topuser(update: Update, context: ContextTypes.DEFAULT_TYPE):
     draw.text((width // 2 - 260, 50), "🏆 Top 10 Traders", font=title_font, fill=text_color)
 
     # User Stats
-    y = 200
+    y = 150
     for i, (user, volume) in enumerate(sorted_users, start=1):
         line = f"{i}. {user} — ₹{volume:.1f}"
         draw.text((100, y), line, font=font, fill=text_color)
-        y += 70
+        y += 50
 
     # Footer (IST time)
     date_str = datetime.now().strftime("%d %b %Y, %I:%M %p") + " IST"
