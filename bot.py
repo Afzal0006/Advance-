@@ -523,7 +523,7 @@ async def topuser(update: Update, context: ContextTypes.DEFAULT_TYPE):
     draw.text((width // 2 - 260, 50), "🏆 Top 10 Traders", font=title_font, fill=text_color)
 
     # User Stats
-    y = 150
+    y = 50
     for i, (user, volume) in enumerate(sorted_users, start=1):
         line = f"{i}. {user} — ₹{volume:.1f}"
         draw.text((100, y), line, font=font, fill=text_color)
