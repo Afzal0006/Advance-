@@ -799,37 +799,36 @@ async def week(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(msg, parse_mode="HTML")
 
 import io, requests
+import io, requests
 from datetime import datetime, timedelta
-from PIL import Image, ImageDraw, ImageFont, ImageFilter
+from PIL import Image, ImageDraw, ImageFont
 from telegram import Update
 from telegram.ext import ContextTypes
 
-# ==== TON Price Command ====
+# ==== /ton Command ====
 async def ton(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        # === Fetch Toncoin Data from CoinGecko API ===
-        r = requests.get("https://api.coingecko.com/api/v3/coins/toncoin")
-        data = r.json()
+        # === Fetch from CoinGecko ===
+        url = "https://api.coingecko.com/api/v3/simple/price?ids=toncoin&vs_currencies=usd&include_24hr_change=true"
+        data = requests.get(url).json()
+        ton = data.get("toncoin", {})
 
-        price = data["market_data"]["current_price"]["usd"]
-        daily_change = data["market_data"]["price_change_percentage_24h"]
-        weekly_change = data["market_data"]["price_change_percentage_7d"]
+        price = ton.get("usd", 0.0)
+        daily_change = ton.get("usd_24h_change", 0.0)
 
-        # === Graph Data (last 7 days) ===
-        chart_data = data["market_data"]["sparkline_7d"]["price"][-80:]  # 7-day small sparkline
+        # === For weekly change (approximate) ===
+        url_week = "https://api.coingecko.com/api/v3/coins/toncoin/market_chart?vs_currency=usd&days=7"
+        week_data = requests.get(url_week).json()
+        prices = [p[1] for p in week_data.get("prices", [])]
+        if len(prices) > 2:
+            weekly_change = ((prices[-1] - prices[0]) / prices[0]) * 100
+        else:
+            weekly_change = 0.0
 
-        # === Create Image Canvas ===
+        # === Create Canvas ===
         width, height = 1200, 600
         img = Image.new("RGB", (width, height), (0, 0, 0))
         draw = ImageDraw.Draw(img)
-
-        # === Rounded Corners Background ===
-        radius = 50
-        mask = Image.new("L", (width, height), 0)
-        mask_draw = ImageDraw.Draw(mask)
-        mask_draw.rounded_rectangle([(0, 0), (width, height)], radius, fill=255)
-        bg = Image.new("RGB", (width, height), (10, 10, 10))
-        bg.paste(img, mask=mask)
 
         # === Fonts ===
         try:
@@ -840,14 +839,12 @@ async def ton(update: Update, context: ContextTypes.DEFAULT_TYPE):
             font_big = font_mid = font_small = ImageFont.load_default()
 
         # === Price ===
-        draw.text((70, 60), f"${price:.4f}", font=font_big, fill=(91, 173, 255))  # light blue
+        draw.text((70, 60), f"${price:.4f}", font=font_big, fill=(91, 173, 255))
 
-        # === Toncoin Label ===
-        label_x = 950
-        label_y = 80
-        label_w, label_h = 200, 80
+        # === Toncoin Label Box ===
+        label_x, label_y = 950, 80
         draw.rounded_rectangle(
-            [label_x, label_y, label_x + label_w, label_y + label_h],
+            [label_x, label_y, label_x + 200, label_y + 80],
             radius=30,
             fill=(230, 240, 255)
         )
@@ -855,56 +852,43 @@ async def ton(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # === Daily Change Box ===
         daily_color = (220, 0, 0) if daily_change < 0 else (0, 180, 0)
-        daily_text = f"{daily_change:+.2f}%"
-        draw.rounded_rectangle(
-            [200, 250, 500, 350],
-            radius=40,
-            fill=(daily_color[0], daily_color[1], daily_color[2], 180)
-        )
-        draw.text((250, 275), daily_text, font=font_mid, fill=(255, 255, 255))
+        draw.rounded_rectangle([200, 250, 500, 350], radius=40, fill=daily_color)
+        draw.text((260, 275), f"{daily_change:+.2f}%", font=font_mid, fill=(255, 255, 255))
         draw.text((230, 380), "DAILY CHANGE", font=font_small, fill=(255, 255, 255))
 
         # === Weekly Change Box ===
         weekly_color = (0, 180, 0) if weekly_change > 0 else (220, 0, 0)
-        weekly_text = f"{weekly_change:+.2f}%"
-        draw.rounded_rectangle(
-            [700, 250, 1000, 350],
-            radius=40,
-            fill=(weekly_color[0], weekly_color[1], weekly_color[2], 180)
-        )
-        draw.text((750, 275), weekly_text, font=font_mid, fill=(255, 255, 255))
+        draw.rounded_rectangle([700, 250, 1000, 350], radius=40, fill=weekly_color)
+        draw.text((760, 275), f"{weekly_change:+.2f}%", font=font_mid, fill=(255, 255, 255))
         draw.text((720, 380), "WEEKLY CHANGE", font=font_small, fill=(255, 255, 255))
 
-        # === Sparkline Graph ===
+        # === Graph ===
         graph_x, graph_y = 100, 470
         graph_w, graph_h = 1000, 100
-        max_p, min_p = max(chart_data), min(chart_data)
-        scale_y = graph_h / (max_p - min_p)
+        if prices:
+            max_p, min_p = max(prices), min(prices)
+            scale_y = graph_h / (max_p - min_p + 1e-6)
+            for i in range(len(prices) - 1):
+                x1 = graph_x + (i / len(prices)) * graph_w
+                y1 = graph_y + graph_h - (prices[i] - min_p) * scale_y
+                x2 = graph_x + ((i + 1) / len(prices)) * graph_w
+                y2 = graph_y + graph_h - (prices[i + 1] - min_p) * scale_y
+                draw.line((x1, y1, x2, y2), fill=(255, 0, 0), width=4)
 
-        for i in range(len(chart_data) - 1):
-            x1 = graph_x + (i / len(chart_data)) * graph_w
-            y1 = graph_y + graph_h - (chart_data[i] - min_p) * scale_y
-            x2 = graph_x + ((i + 1) / len(chart_data)) * graph_w
-            y2 = graph_y + graph_h - (chart_data[i + 1] - min_p) * scale_y
-            draw.line((x1, y1, x2, y2), fill=(255, 0, 0), width=4)
-
-        # === Dates ===
+        # === Date Labels ===
         today = datetime.utcnow()
         for i in range(7):
-            day_label = (today - timedelta(days=6 - i)).strftime("%b %d")
-            draw.text((graph_x + i * 150, graph_y + graph_h + 10), day_label, font=font_small, fill=(180, 180, 180))
+            label = (today - timedelta(days=6 - i)).strftime("%b %d")
+            draw.text((graph_x + i * 150, graph_y + graph_h + 10), label, font=font_small, fill=(180, 180, 180))
 
-        # === Save Image ===
+        # === Save and Send ===
         bio = io.BytesIO()
         img.save(bio, "PNG", optimize=True)
         bio.seek(0)
-
-        # === Send to Telegram ===
         await update.message.reply_photo(photo=bio, caption="📈 Toncoin Price Tracker")
 
     except Exception as e:
         await update.message.reply_text(f"⚠️ Error fetching Toncoin data:\n`{e}`", parse_mode="Markdown")
-
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
