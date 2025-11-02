@@ -923,7 +923,7 @@ def main():
     app.add_handler(CommandHandler("mydeals", mydeals))
     app.add_handler(CommandHandler("daily", daily))
     app.add_handler(CommandHandler("week", week))
-    application.add_handler(CommandHandler("ton", ton))
+    app.add_handler(CommandHandler("ton", ton))
 
     print("Bot started... ✅")
     app.run_polling()
