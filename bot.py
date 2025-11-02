@@ -416,7 +416,7 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # === Text to Display ===
     lines = [
-        f"📊 Participant Stats for {username}",
+        f"# Participant Stats for {username}",
         "",
         f"•  Ranking: {rank}",
         f"•  Total Volume :  {total_volume:.1f} INR",
