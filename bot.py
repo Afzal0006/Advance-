@@ -439,7 +439,7 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # === Load crisp bold fonts ===
     try:
-        title_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 120)
+        title_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 100)
         font = ImageFont.truetype("DejaVuSans.ttf", 100)
     except:
         font = ImageFont.load_default()
@@ -454,7 +454,7 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         draw.text((x, y), text, font=font, fill=fill)
 
     # === Draw text ===
-    y_text = 180
+    y_text = 130
     for i, line in enumerate(lines):
         if i == 0:
             draw_text_bold(draw, (150, y_text), line, title_font, font_color)
