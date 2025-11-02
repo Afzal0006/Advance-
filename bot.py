@@ -366,9 +366,10 @@ async def global_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(msg)
 
-from PIL import Image, ImageDraw, ImageFont
-import io
 from datetime import datetime
+from zoneinfo import ZoneInfo
+import io
+from PIL import Image, ImageDraw, ImageFont
 from telegram import Update
 from telegram.ext import ContextTypes
 
@@ -462,17 +463,16 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
             draw_text_bold(draw, (200, y_text + 20), line, font, font_color)
         y_text += 130
 
-    # Footer
-date_str = datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%d %b %Y, %H:%M IST")
-draw.text((150, height - 150), f"📅 Generated on {date_str}", font=font, fill=(100, 100, 100))
+    # === Footer ===
+    date_str = datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%d %b %Y, %H:%M IST")
+    draw.text((150, height - 150), f"📅 Generated on {date_str}", font=font, fill=(100, 100, 100))
+
     # === Save to memory and send ===
     bio = io.BytesIO()
     img.save(bio, "PNG", optimize=True)
     bio.seek(0)
 
     await update.message.reply_photo(photo=bio, caption="📋 Your Escrow Stats Summary")
-
-from datetime import datetime
 
 # === Top 20 Users (Text Output with 🥇🥈🥉 badges) ===
 async def topuser(update: Update, context: ContextTypes.DEFAULT_TYPE):
