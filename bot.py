@@ -426,7 +426,7 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
 
     # === Generate clean white-page image ===
-    width, height = 400, 400
+    width, height = 800, 600
     bg_color = (255, 255, 255)   # white background
     font_color = (0, 0, 0)       # black text
 
@@ -434,18 +434,18 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     draw = ImageDraw.Draw(img)
 
     # Optional: light border / shadow for professional look
-    border_color = (220, 220, 220)
-    draw.rectangle([(10, 10), (width - 10, height - 10)], outline=border_color, width=3)
+    border_color = (230, 230, 230)
+    draw.rectangle([(10, 10), (width - 10, height - 10)], outline=border_color, width=5)
 
     # Add text
     try:
-        font = ImageFont.truetype("arial.ttf", 56)
-        title_font = ImageFont.truetype("arialbd.ttf", 68)
+        font = ImageFont.truetype("arial.ttf", 70)
+        title_font = ImageFont.truetype("arialbd.ttf", 48)
     except:
         font = ImageFont.load_default()
         title_font = font
 
-    y_text = 60
+    y_text = 50
     for i, line in enumerate(lines):
         if i == 0:
             draw.text((50, y_text), line, font=title_font, fill=font_color)
