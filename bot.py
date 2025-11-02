@@ -833,7 +833,7 @@ async def ton(update: Update, context: ContextTypes.DEFAULT_TYPE):
             weekly_change = ((prices[-1] - prices[0]) / prices[0]) * 100
 
         # === Create image canvas ===
-        width, height = 1200, 600
+        width, height = 1200, 1200
         img = Image.new("RGB", (width, height), (0, 0, 0))
         draw = ImageDraw.Draw(img)
 
@@ -897,6 +897,7 @@ async def ton(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         await update.message.reply_text(f"⚠️ Error fetching Toncoin data:\n`{e}`", parse_mode="Markdown")
+        
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
