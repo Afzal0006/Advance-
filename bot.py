@@ -419,50 +419,58 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"📊 Participant Stats for {username}",
         "",
         f"•  Ranking: {rank}",
-        f"•  Total Volume :  {total_volume:.1f} inr",
+        f"•  Total Volume :  {total_volume:.1f} INR",
         f"•  Total Deals :  {total_deals}",
         f"•  Ongoing Deals :  {ongoing_deals}",
-        f"•  Highest Deal :  {highest_deal:.1f} inr"
+        f"•  Highest Deal :  {highest_deal:.1f} INR"
     ]
 
-    # === Generate clean white-page image ===
-    width, height = 800, 600
-    bg_color = (255, 255, 255)   # white background
-    font_color = (0, 0, 0)       # black text
+    # === High-resolution white image ===
+    width, height = 2400, 1800
+    bg_color = (255, 255, 255)
+    font_color = (0, 0, 0)
 
     img = Image.new("RGB", (width, height), bg_color)
     draw = ImageDraw.Draw(img)
 
-    # Optional: light border / shadow for professional look
+    # Border
     border_color = (0, 0, 0)
-    draw.rectangle([(10, 10), (width - 10, height - 10)], outline=border_color, width=5)
+    draw.rectangle([(20, 20), (width - 20, height - 20)], outline=border_color, width=10)
 
-    # Add text
+    # === Load crisp bold fonts ===
     try:
-        font = ImageFont.truetype(DejaVuSans.ttf", 140)
-        title_font = ImageFont.truetype(DejaVuSans-Bold.ttf", 200)
+        title_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 180)
+        font = ImageFont.truetype("DejaVuSans.ttf", 140)
     except:
         font = ImageFont.load_default()
         title_font = font
 
-    y_text = 50
+    # === Helper to make text bold/dark ===
+    def draw_text_bold(draw, position, text, font, fill):
+        x, y = position
+        for dx in [-2, 0, 2]:
+            for dy in [-2, 0, 2]:
+                draw.text((x+dx, y+dy), text, font=font, fill=fill)
+        draw.text((x, y), text, font=font, fill=fill)
+
+    # === Draw text ===
+    y_text = 200
     for i, line in enumerate(lines):
         if i == 0:
-            draw.text((50, y_text), line, font=title_font, fill=font_color)
+            draw_text_bold(draw, (150, y_text), line, title_font, font_color)
         else:
-            draw.text((70, y_text + 10), line, font=font, fill=font_color)
-        y_text += 50
+            draw_text_bold(draw, (200, y_text + 20), line, font, font_color)
+        y_text += 180
 
     # Footer
     date_str = datetime.utcnow().strftime("%d %b %Y, %H:%M UTC")
-    draw.text((50, height - 60), f"📅 Generated on {date_str}", font=font, fill=(120, 120, 120))
+    draw.text((150, height - 150), f"📅 Generated on {date_str}", font=font, fill=(100, 100, 100))
 
-    # === Save image to memory ===
+    # === Save to memory and send ===
     bio = io.BytesIO()
-    img.save(bio, "PNG")
+    img.save(bio, "PNG", optimize=True)
     bio.seek(0)
 
-    # === Send photo ===
     await update.message.reply_photo(photo=bio, caption="📋 Your Escrow Stats Summary")
 
 # ==== All stats (Top users) ====
