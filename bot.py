@@ -829,7 +829,7 @@ async def ton(update: Update, context: ContextTypes.DEFAULT_TYPE):
         weekly_change = ((prices[-1] - prices[0]) / prices[0]) * 100 if len(prices) > 1 else 0
 
         # === Image Canvas ===
-        width, height = 1200, 600
+        width, height = 1200, 800
         img = Image.new("RGB", (width, height), (10, 15, 40))
         draw = ImageDraw.Draw(img)
 
