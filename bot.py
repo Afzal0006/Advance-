@@ -439,7 +439,7 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # === Load crisp bold fonts ===
     try:
-        title_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 140)
+        title_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 120)
         font = ImageFont.truetype("DejaVuSans.ttf", 100)
     except:
         font = ImageFont.load_default()
