@@ -473,11 +473,9 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_photo(photo=bio, caption="📋 Your Escrow Stats Summary")
 
-from PIL import Image, ImageDraw, ImageFont
-import io
 from datetime import datetime
 
-# === Top Users (Image Output by Volume) ===
+# === Top 20 Users (Text Output with 🥇🥈🥉 badges) ===
 async def topuser(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin(update):
         return await update.message.reply_text("❌ Only admins can use this command!")
@@ -497,48 +495,26 @@ async def topuser(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not users_data:
         return await update.message.reply_text("📊 No deals found.")
 
-    # Sort by volume (descending)
-    sorted_users = sorted(users_data.items(), key=lambda x: x[1], reverse=True)[:10]
+    # Sort users by total volume
+    sorted_users = sorted(users_data.items(), key=lambda x: x[1], reverse=True)[:20]
 
-    # === Create Image ===
-    width, height = 900, 900
-    bg_color = (255, 255, 255)
-    text_color = (0, 0, 0)
+    # Header
+    msg = "🏆 <b>Top 20 Traders (by Volume)</b>\n"
+    msg += "────────────────────────────\n"
 
-    img = Image.new("RGB", (width, height), bg_color)
-    draw = ImageDraw.Draw(img)
+    # Badge map for top 3
+    badges = {1: "🥇", 2: "🥈", 3: "🥉"}
 
-    # Border
-    draw.rectangle([(15, 10), (width - 15, height - 10)], outline=(0, 0, 0), width=5)
-
-    # Fonts
-    try:
-        title_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 50)
-        font = ImageFont.truetype("DejaVuSans.ttf", 45)
-    except:
-        title_font = ImageFont.load_default()
-        font = ImageFont.load_default()
-
-    # Title
-    draw.text((width // 2 - 260, 50), "🏆 Top 10 Traders", font=title_font, fill=text_color)
-
-    # User Stats
-    y = 150
+    # User list with badges
     for i, (user, volume) in enumerate(sorted_users, start=1):
-        line = f"{i}. {user} — ₹{volume:.1f}"
-        draw.text((100, y), line, font=font, fill=text_color)
-        y += 50
+        badge = badges.get(i, f"{i}.")
+        msg += f"{badge} {user} — ₹{volume:.1f}\n"
 
-    # Footer (IST time)
+    # Footer (IST)
     date_str = datetime.now().strftime("%d %b %Y, %I:%M %p") + " IST"
-    draw.text((50, height - 60), f"📅 Generated on {date_str}", font=font, fill=(100, 100, 100))
+    msg += f"\n📅 Generated on {date_str}"
 
-    # Save & send
-    bio = io.BytesIO()
-    img.save(bio, "PNG")
-    bio.seek(0)
-    await update.message.reply_photo(photo=bio, caption="📊 Top 10 Traders (by Volume)")
-
+    await update.message.reply_text(msg, parse_mode="HTML")
 # ==== Admin commands ====
 async def add_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
