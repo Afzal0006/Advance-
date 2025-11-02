@@ -418,11 +418,11 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     lines = [
         f"📊 Participant Stats for {username}",
         "",
-        f"👑 Ranking: {rank}",
-        f"📈 Total Volume: ₹{total_volume:.1f}",
-        f"🧳 Total Deals: {total_deals}",
-        f"🧿 Ongoing Deals: {ongoing_deals}",
-        f"💳 Highest Deal: ₹{highest_deal:.1f}"
+        f"• Ranking: {rank}",
+        f"• Total Volume: ₹{total_volume:.1f}",
+        f"• Total Deals: {total_deals}",
+        f"• Ongoing Deals: {ongoing_deals}",
+        f" Highest Deal: ₹{highest_deal:.1f}"
     ]
 
     # === Generate clean white-page image ===
