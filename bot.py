@@ -434,7 +434,7 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     draw = ImageDraw.Draw(img)
 
     # Optional: light border / shadow for professional look
-    border_color = (280, 280, 280)
+    border_color = (0, 0, 0)
     draw.rectangle([(10, 10), (width - 10, height - 10)], outline=border_color, width=5)
 
     # Add text
