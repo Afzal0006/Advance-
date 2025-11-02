@@ -807,7 +807,7 @@ from telegram.ext import ContextTypes
 # ==== /ton Command ====
 async def ton(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        # === Fetch Toncoin data from CoinGecko ===
+        # === Fetch from CoinGecko ===
         url = "https://api.coingecko.com/api/v3/simple/price"
         params = {
             "ids": "the-open-network",
@@ -821,72 +821,60 @@ async def ton(update: Update, context: ContextTypes.DEFAULT_TYPE):
         price = ton.get("usd", 0.0)
         daily_change = ton.get("usd_24h_change", 0.0)
 
-        # === Weekly change (fallback static fetch for last 7 days) ===
+        # === Fetch market chart for weekly change ===
         week_url = "https://api.coingecko.com/api/v3/coins/the-open-network/market_chart"
         week_res = requests.get(week_url, params={"vs_currency": "usd", "days": "7"})
         week_data = week_res.json()
         prices = [p[1] for p in week_data.get("prices", [])]
+        weekly_change = ((prices[-1] - prices[0]) / prices[0]) * 100 if len(prices) > 1 else 0
 
-        weekly_change = 0.0
-        if len(prices) > 2:
-            weekly_change = ((prices[-1] - prices[0]) / prices[0]) * 100
-
-        # === Create Toncoin themed background ===
-        width, height = 1400, 700
-        img = Image.new("RGB", (width, height), (5, 25, 55))
+        # === Image Canvas ===
+        width, height = 1200, 600
+        img = Image.new("RGB", (width, height), (10, 15, 40))
         draw = ImageDraw.Draw(img)
 
-        # === Blue gradient background ===
+        # === Gradient background (TON style) ===
         for y in range(height):
-            r = int(5 + (y / height) * 20)
-            g = int(25 + (y / height) * 80)
-            b = int(55 + (y / height) * 150)
-            draw.line((0, y, width, y), fill=(r, g, b))
-        img = img.filter(ImageFilter.GaussianBlur(0.6))
+            blue = int(50 + (y / height) * 120)
+            draw.line([(0, y), (width, y)], fill=(0, blue, 255))
+
+        # === Add soft glow ===
+        glow = img.filter(ImageFilter.GaussianBlur(30))
+        img = Image.blend(img, glow, 0.3)
+        draw = ImageDraw.Draw(img)
 
         # === Fonts ===
         try:
-            font_big = ImageFont.truetype("DejaVuSans-Bold.ttf", 130)
+            font_big = ImageFont.truetype("DejaVuSans-Bold.ttf", 140)
             font_mid = ImageFont.truetype("DejaVuSans-Bold.ttf", 70)
             font_small = ImageFont.truetype("DejaVuSans.ttf", 45)
         except:
             font_big = font_mid = font_small = ImageFont.load_default()
 
         # === Title ===
-        draw.text((80, 40), "TONCOIN", font=font_big, fill=(91, 173, 255))
+        draw.text((70, 60), "TONCOIN", font=font_mid, fill=(255, 255, 255))
 
         # === Price ===
-        draw.text((100, 220), f"${price:.4f}", font=font_big, fill=(255, 255, 255))
+        draw.text((70, 180), f"${price:,.4f}", font=font_big, fill=(91, 173, 255))
 
-        # === Daily change box ===
-        daily_color = (0, 200, 0) if daily_change >= 0 else (220, 0, 0)
-        draw.rounded_rectangle([150, 420, 550, 520], radius=50, fill=daily_color)
-        draw.text((220, 435), f"Daily: {daily_change:+.2f}%", font=font_mid, fill=(255, 255, 255))
+        # === Boxes for Daily & Weekly change ===
+        def draw_box(x, y, color, label, value):
+            draw.rounded_rectangle([x, y, x + 400, y + 150], radius=40, fill=color)
+            draw.text((x + 50, y + 30), label, font=font_small, fill=(255, 255, 255))
+            draw.text((x + 50, y + 80), f"{value:+.2f}%", font=font_mid, fill=(255, 255, 255))
 
-        # === Weekly change box ===
-        weekly_color = (0, 200, 0) if weekly_change >= 0 else (220, 0, 0)
-        draw.rounded_rectangle([750, 420, 1150, 520], radius=50, fill=weekly_color)
-        draw.text((820, 435), f"Weekly: {weekly_change:+.2f}%", font=font_mid, fill=(255, 255, 255))
+        daily_color = (0, 180, 0) if daily_change >= 0 else (220, 0, 0)
+        weekly_color = (0, 180, 0) if weekly_change >= 0 else (220, 0, 0)
 
-        # === Footer ===
-        timestamp = datetime.utcnow().strftime("%b %d, %Y • %H:%M UTC")
-        draw.text((80, 620), f"Updated {timestamp}", font=font_small, fill=(200, 200, 200))
+        draw_box(100, 400, daily_color, "DAILY CHANGE", daily_change)
+        draw_box(700, 400, weekly_color, "WEEKLY CHANGE", weekly_change)
 
-        # === Subtle Toncoin logo background ===
-        logo_color = (80, 160, 255, 90)
-        for i in range(5):
-            r = 220 - i * 30
-            draw.ellipse(
-                [1000 - i * 20, 100 - i * 20, 1350 + i * 20, 450 + i * 20],
-                outline=logo_color, width=5
-            )
-
-        # === Save to buffer and send ===
+        # === Save & Send ===
         bio = io.BytesIO()
         img.save(bio, "PNG", optimize=True)
         bio.seek(0)
 
-        await update.message.reply_photo(photo=bio, caption="📊 **Toncoin Price Update**", parse_mode="Markdown")
+        await update.message.reply_photo(photo=bio, caption="💎 **Toncoin Price Tracker**", parse_mode="Markdown")
 
     except Exception as e:
         await update.message.reply_text(f"⚠️ Error fetching Toncoin data:\n`{e}`", parse_mode="Markdown")
