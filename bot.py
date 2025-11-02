@@ -501,7 +501,7 @@ async def topuser(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sorted_users = sorted(users_data.items(), key=lambda x: x[1], reverse=True)[:10]
 
     # === Create Image ===
-    width, height = 900, 800
+    width, height = 900, 900
     bg_color = (255, 255, 255)
     text_color = (0, 0, 0)
 
@@ -509,7 +509,7 @@ async def topuser(update: Update, context: ContextTypes.DEFAULT_TYPE):
     draw = ImageDraw.Draw(img)
 
     # Border
-    draw.rectangle([(10, 10), (width - 10, height - 10)], outline=(0, 0, 0), width=5)
+    draw.rectangle([(15, 10), (width - 15, height - 10)], outline=(0, 0, 0), width=5)
 
     # Fonts
     try:
