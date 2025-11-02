@@ -439,8 +439,8 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # === Load crisp bold fonts ===
     try:
-        title_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 180)
-        font = ImageFont.truetype("DejaVuSans.ttf", 140)
+        title_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 140)
+        font = ImageFont.truetype("DejaVuSans.ttf", 100)
     except:
         font = ImageFont.load_default()
         title_font = font
@@ -454,13 +454,13 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         draw.text((x, y), text, font=font, fill=fill)
 
     # === Draw text ===
-    y_text = 200
+    y_text = 180
     for i, line in enumerate(lines):
         if i == 0:
             draw_text_bold(draw, (150, y_text), line, title_font, font_color)
         else:
             draw_text_bold(draw, (200, y_text + 20), line, font, font_color)
-        y_text += 180
+        y_text += 130
 
     # Footer
     date_str = datetime.utcnow().strftime("%d %b %Y, %H:%M UTC")
