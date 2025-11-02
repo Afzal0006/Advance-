@@ -418,11 +418,11 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     lines = [
         f"📊 Participant Stats for {username}",
         "",
-        f"• Ranking: {rank}",
-        f"• Total Volume: ₹{total_volume:.1f}",
-        f"• Total Deals: {total_deals}",
-        f"• Ongoing Deals: {ongoing_deals}",
-        f" Highest Deal: ₹{highest_deal:.1f}"
+        f"•  Ranking: {rank}",
+        f"•  Total Volume:  {total_volume:.1f} inr",
+        f"•  Total Deals:  {total_deals}",
+        f"•  Ongoing Deals:  {ongoing_deals}",
+        f"•  Highest Deal:  {highest_deal:.1f} inr"
     ]
 
     # === Generate clean white-page image ===
@@ -434,7 +434,7 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     draw = ImageDraw.Draw(img)
 
     # Optional: light border / shadow for professional look
-    border_color = (230, 230, 230)
+    border_color = (280, 280, 280)
     draw.rectangle([(10, 10), (width - 10, height - 10)], outline=border_color, width=5)
 
     # Add text
