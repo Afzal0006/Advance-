@@ -463,9 +463,8 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         y_text += 130
 
     # Footer
-    date_str = datetime.utcnow().strftime("%d %b %Y, %H:%M UTC")
-    draw.text((150, height - 150), f"📅 Generated on {date_str}", font=font, fill=(100, 100, 100))
-
+date_str = datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%d %b %Y, %H:%M IST")
+draw.text((150, height - 150), f"📅 Generated on {date_str}", font=font, fill=(100, 100, 100))
     # === Save to memory and send ===
     bio = io.BytesIO()
     img.save(bio, "PNG", optimize=True)
