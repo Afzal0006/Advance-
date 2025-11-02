@@ -1,3 +1,6 @@
 python-telegram-bot==20.3
 pymongo
 reportlab
+python-telegram-bot==20.4
+pillow==10.4.0
+aiohttp==4.1.0
