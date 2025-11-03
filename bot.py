@@ -816,125 +816,132 @@ def create_sheet_image(rows, page_title="My Deals", columns=None, rows_per_page=
         columns = ["BUYER", "SELLER", "ESCROWER", "TRADE ID", "AMOUNT"]
 
     width = 1000
-    header_h = 90
-    row_h = 70
-    footer_h = 30
-    col_widths = [180, 180, 180, 220, 180]
-    height = header_h + len(rows) * row_h + footer_h + 40
+import io
+from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+from reportlab.platypus import (
+    SimpleDocTemplate, Table, TableStyle,
+    Paragraph, Spacer, Image
+)
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from telegram import Update, InputFile
+from telegram.ext import ContextTypes
+from datetime import datetime
 
-    img = Image.new("RGB", (width, height), (255, 255, 255))
-    draw = ImageDraw.Draw(img)
-
-    # === Fonts ===
-    try:
-        font_bold = ImageFont.truetype("arialbd.ttf", 28)
-        font_regular = ImageFont.truetype("arial.ttf", 24)
-    except:
-        font_bold = ImageFont.load_default()
-        font_regular = ImageFont.load_default()
-
-    # === Title ===
-    draw.text((30, 20), page_title, font=font_bold, fill=(0, 0, 0))
-
-    # === Column boundaries ===
-    x_start = 20
-    col_x = [x_start]
-    for w in col_widths:
-        col_x.append(col_x[-1] + w)
-
-    # === Vertical thin lines (same as horizontal) ===
-    for x in col_x:
-        draw.line([(x + 0.5, header_h - 10), (x + 0.5, height - footer_h)], width=1, fill=(0, 0, 0))
-
-    # === Column Headers ===
-    cur_x = x_start
-    for i, c in enumerate(columns):
-        w = col_widths[i]
-        try:
-            bbox = draw.textbbox((0, 0), c, font=font_bold)
-            tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
-        except AttributeError:
-            tw, th = draw.textsize(c, font=font_bold)
-        tx = cur_x + (w - tw) / 2
-        draw.text((tx, header_h - 50), c, font=font_bold, fill=(0, 0, 0))
-        cur_x += w
-
-    # === Rows + Thin horizontal lines ===
-    for i, row in enumerate(rows):
-        y = header_h + i * row_h
-        draw.line([(x_start, y + row_h - 10), (width - 20, y + row_h - 10)], width=1, fill=(0, 0, 0))
-
-        # Row text values
-        vals = [
-            str(row.get("buyer", "")),
-            str(row.get("seller", "")),
-            str(row.get("escrower", "")),
-            str(row.get("trade_id", "")),
-            f"₹{row.get('amount', 0)}",
-        ]
-
-        # Proper text alignment inside each cell
-        cur_x = x_start
-        for j, val in enumerate(vals):
-            try:
-                bbox = draw.textbbox((0, 0), val, font=font_regular)
-                tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
-            except AttributeError:
-                tw, th = draw.textsize(val, font=font_regular)
-            tx = cur_x + 10  # left padding
-            ty = y + (row_h - th) / 2  # vertical centering
-            draw.text((tx, ty), val, font=font_regular, fill=(0, 0, 0))
-            cur_x += col_widths[j]
-
-    return img
-
-
-def pil_image_to_pdf_bytes(img):
-    """Convert PIL image to in-memory PDF bytes."""
-    bio = io.BytesIO()
-    if img.mode in ("RGBA", "LA"):
-        bg = Image.new("RGB", img.size, (255, 255, 255))
-        bg.paste(img, mask=img.split()[3])
-        img = bg
-    img.save(bio, format="PDF")
-    bio.seek(0)
-    return bio
-
-
-# ==============================
-# === /mystats COMMAND ===
-# ==============================
 
 async def mystats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     username = f"@{user.username}" if user.username else user.full_name
 
-    # === Collect deals (use your Mongo groups_col) ===
+    # === Collect deals (replace with Mongo data) ===
     all_deals = []
     for g in groups_col.find({}):
         for d in g.get("deals", {}).values():
             if username in [d.get("buyer"), d.get("seller"), d.get("escrower")]:
-                all_deals.append({
-                    "buyer": d.get("buyer", ""),
-                    "seller": d.get("seller", ""),
-                    "escrower": d.get("escrower", ""),
-                    "trade_id": d.get("trade_id", ""),
-                    "amount": d.get("added_amount", 0)
-                })
+                all_deals.append([
+                    d.get("buyer", ""),
+                    d.get("seller", ""),
+                    d.get("escrower", ""),
+                    d.get("trade_id", ""),
+                    f"₹{d.get('added_amount', 0)}"
+                ])
 
     if not all_deals:
         return await update.message.reply_text("🎉 No deals found for you!")
 
-    # === Create image ===
-    img = create_sheet_image(all_deals, page_title=f"{username}'s Deals")
+    # === Create PDF in memory ===
+    buffer = io.BytesIO()
+    pdf = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        title=f"{username}'s Deals Summary",
+        rightMargin=40,
+        leftMargin=40,
+        topMargin=60,
+        bottomMargin=40
+    )
 
-    # === Convert to PDF ===
-    pdf_bytes = pil_image_to_pdf_bytes(img)
-    file_name = f"{username.strip('@')}_deals.pdf"
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        name="TitleStyle",
+        parent=styles['Title'],
+        fontSize=22,
+        leading=26,
+        alignment=1,  # center
+        textColor=colors.HexColor("#1F4E79")
+    )
 
+    subtitle_style = ParagraphStyle(
+        name="Subtitle",
+        parent=styles['Normal'],
+        fontSize=11,
+        leading=14,
+        textColor=colors.grey,
+        alignment=1
+    )
+
+    footer_style = ParagraphStyle(
+        name="Footer",
+        parent=styles['Normal'],
+        fontSize=9,
+        textColor=colors.grey,
+        alignment=1
+    )
+
+    elements = []
+
+    # === Header ===
+    elements.append(Paragraph("<b>ESCROW TRADE SUMMARY</b>", title_style))
+    elements.append(Paragraph(f"Generated for {username}", subtitle_style))
+    elements.append(Spacer(1, 12))
+    elements.append(Paragraph(datetime.now().strftime("📅 %B %d, %Y • %I:%M %p UTC"), subtitle_style))
+    elements.append(Spacer(1, 18))
+
+    # === Table Data ===
+    table_data = [["BUYER", "SELLER", "ESCROWER", "TRADE ID", "AMOUNT"]] + all_deals
+
+    table = Table(table_data, colWidths=[100, 100, 100, 130, 80])
+    table.setStyle(TableStyle([
+        # Header row
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#DDEBF7")),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor("#1F4E79")),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+
+        # Body
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 1), (-1, -1), 11),
+        ('ALIGN', (0, 1), (-1, -1), 'LEFT'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+
+        # Borders
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#A6A6A6")),
+
+        # Alternate row color
+        ('BACKGROUND', (0, 1), (-1, -1), colors.whitesmoke),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1),
+         [colors.whitesmoke, colors.HexColor("#F7FBFF")]),
+    ]))
+
+    elements.append(table)
+    elements.append(Spacer(1, 20))
+
+    # === Footer ===
+    elements.append(Paragraph(
+        "💼 Generated securely via <b>Telegram Escrow Bot</b><br/>"
+        "This report summarizes all completed and ongoing trades.",
+        footer_style
+    ))
+
+    pdf.build(elements)
+    buffer.seek(0)
+
+    # === Send PDF ===
     await update.effective_chat.send_document(
-        document=InputFile(pdf_bytes, filename=file_name),
-        caption=f"📄 Your deals summary, {username}"
+        document=InputFile(buffer, filename=f"{username.strip('@')}_deals.pdf"),
+        caption=f"📄 Professional deal report for {username}"
     )
         
 def main():
