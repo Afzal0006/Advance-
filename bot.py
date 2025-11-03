@@ -878,6 +878,133 @@ async def ton(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         await update.message.reply_text(f"⚠️ Error fetching Toncoin data:\n`{e}`", parse_mode="Markdown")
+
+import io
+from PIL import Image, ImageDraw, ImageFont
+from telegram import Update, InputFile
+from telegram.ext import ContextTypes
+
+# ==============================
+# === HELPER FUNCTIONS ===
+# ==============================
+
+def create_sheet_image(rows, page_title="My Deals", columns=None, rows_per_page=12):
+    """
+    Draws image with vertical + horizontal lines like your example.
+    rows = list of dicts with buyer/seller/escrower/trade_id/amount
+    """
+    if columns is None:
+        columns = ["BUYER", "SELLER", "ESCROWER", "ID", "AMOUNT"]
+
+    width = 1000
+    header_h = 90
+    row_h = 70
+    footer_h = 30
+    col_widths = [180, 180, 180, 220, 180]  # per column width
+    height = header_h + len(rows) * row_h + footer_h + 40
+
+    img = Image.new("RGB", (width, height), (255, 255, 255))
+    draw = ImageDraw.Draw(img)
+
+    # === Fonts ===
+    try:
+        font_bold = ImageFont.truetype("arialbd.ttf", 28)
+        font_regular = ImageFont.truetype("arial.ttf", 22)
+    except:
+        font_bold = ImageFont.load_default()
+        font_regular = ImageFont.load_default()
+
+    # === Title ===
+    draw.text((30, 20), page_title, font=font_bold, fill=(0, 0, 0))
+
+    # === Column boundaries ===
+    x_start = 20
+    col_x = [x_start]
+    for w in col_widths:
+        col_x.append(col_x[-1] + w)
+
+    # Draw vertical black lines
+    for x in col_x:
+        draw.line([(x, header_h - 10), (x, height - footer_h)], width=8, fill=(0, 0, 0))
+
+    # === Column Headers ===
+    cur_x = x_start
+    for i, c in enumerate(columns):
+        w = col_widths[i]
+        tw, th = draw.textsize(c, font=font_bold)
+        tx = cur_x + (w - tw) / 2
+        draw.text((tx, header_h - 50), c, font=font_bold, fill=(0, 0, 0))
+        cur_x += w
+
+    # === Horizontal lines & row data ===
+    for i, row in enumerate(rows):
+        y = header_h + i * row_h
+        draw.line([(x_start, y + row_h - 10), (width - 20, y + row_h - 10)], width=2, fill=(0, 0, 0))
+
+        vals = [
+            str(row.get("buyer", "")),
+            str(row.get("seller", "")),
+            str(row.get("escrower", "")),
+            str(row.get("trade_id", "")),
+            f"₹{row.get('amount', 0)}",
+        ]
+
+        cur_x = x_start
+        for j, val in enumerate(vals):
+            draw.text((cur_x + 10, y + 20), val, font=font_regular, fill=(0, 0, 0))
+            cur_x += col_widths[j]
+
+    return img
+
+
+def pil_image_to_pdf_bytes(img):
+    """Convert PIL image → PDF (in memory)."""
+    bio = io.BytesIO()
+    if img.mode in ("RGBA", "LA"):
+        bg = Image.new("RGB", img.size, (255, 255, 255))
+        bg.paste(img, mask=img.split()[3])
+        img = bg
+    img.save(bio, format="PDF")
+    bio.seek(0)
+    return bio
+
+
+# ==============================
+# === /mystats COMMAND ===
+# ==============================
+
+async def mystats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    username = f"@{user.username}" if user.username else user.full_name
+
+    # === Collect user deals from your Mongo ===
+    # (you already have groups_col, so just paste this part)
+    all_deals = []
+    for g in groups_col.find({}):
+        for d in g.get("deals", {}).values():
+            if username in [d.get("buyer"), d.get("seller"), d.get("escrower")]:
+                all_deals.append({
+                    "buyer": d.get("buyer", ""),
+                    "seller": d.get("seller", ""),
+                    "escrower": d.get("escrower", ""),
+                    "trade_id": d.get("trade_id", ""),
+                    "amount": d.get("added_amount", 0)
+                })
+
+    if not all_deals:
+        return await update.message.reply_text("🎉 No deals found for you!")
+
+    # === Create image like your example ===
+    img = create_sheet_image(all_deals, page_title=f"{username}'s Deals")
+
+    # === Convert to PDF ===
+    pdf_bytes = pil_image_to_pdf_bytes(img)
+    file_name = f"{username.strip('@')}_deals.pdf"
+
+    await update.effective_chat.send_document(
+        document=InputFile(pdf_bytes, filename=file_name),
+        caption=f"📄 Your deals summary, {username}"
+        )
         
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
@@ -898,6 +1025,7 @@ def main():
     app.add_handler(CommandHandler("daily", daily))
     app.add_handler(CommandHandler("week", week))
     app.add_handler(CommandHandler("ton", ton))
+    app.add_handler(CommandHandler("mystats", mystats))
 
     print("Bot started... ✅")
     app.run_polling()
