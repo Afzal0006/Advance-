@@ -931,7 +931,7 @@ async def history(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # === Send PDF ===
     await update.effective_chat.send_document(
         document=InputFile(buffer, filename=f"{username.strip('@')}_deals.pdf"),
-        caption=f"📄 Professional deal report for {username}"
+        caption=f"All deal history for {username}"
     )
 
 from datetime import datetime, timedelta, timezone
