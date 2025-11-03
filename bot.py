@@ -799,29 +799,11 @@ async def week(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(msg, parse_mode="HTML")
 
 import io
-from PIL import Image, ImageDraw, ImageFont
-from telegram import Update, InputFile
-from telegram.ext import ContextTypes
-
-
-# ==============================
-# === IMAGE + PDF HELPERS ===
-# ==============================
-
-def create_sheet_image(rows, page_title="My Deals", columns=None, rows_per_page=12):
-    """
-    Creates a clean, copyable, table-like image with thin equal lines and readable text.
-    """
-    if columns is None:
-        columns = ["BUYER", "SELLER", "ESCROWER", "TRADE ID", "AMOUNT"]
-
-    width = 1000
-import io
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.platypus import (
     SimpleDocTemplate, Table, TableStyle,
-    Paragraph, Spacer, Image
+    Paragraph, Spacer
 )
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from telegram import Update, InputFile
@@ -843,11 +825,20 @@ async def mystats(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     d.get("seller", ""),
                     d.get("escrower", ""),
                     d.get("trade_id", ""),
-                    f"₹{d.get('added_amount', 0)}"
+                    f"₹{d.get('added_amount', 0)}",
+                    d.get("time_added", "")  # for sorting if available
                 ])
 
     if not all_deals:
         return await update.message.reply_text("🎉 No deals found for you!")
+
+    # === Sort by time or trade_id (old → new) ===
+    all_deals.sort(key=lambda x: x[-1])  # sort by time_added (last element)
+
+    # === Add numbering column ===
+    numbered_deals = []
+    for i, deal in enumerate(all_deals, start=1):
+        numbered_deals.append([str(i)] + deal[:-1])  # remove last 'time_added'
 
     # === Create PDF in memory ===
     buffer = io.BytesIO()
@@ -898,9 +889,9 @@ async def mystats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elements.append(Spacer(1, 18))
 
     # === Table Data ===
-    table_data = [["BUYER", "SELLER", "ESCROWER", "TRADE ID", "AMOUNT"]] + all_deals
+    table_data = [["#", "BUYER", "SELLER", "ESCROWER", "TRADE ID", "AMOUNT"]] + numbered_deals
 
-    table = Table(table_data, colWidths=[100, 100, 100, 130, 80])
+    table = Table(table_data, colWidths=[30, 100, 100, 100, 130, 80])
     table.setStyle(TableStyle([
         # Header row
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#DDEBF7")),
@@ -920,7 +911,6 @@ async def mystats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#A6A6A6")),
 
         # Alternate row color
-        ('BACKGROUND', (0, 1), (-1, -1), colors.whitesmoke),
         ('ROWBACKGROUNDS', (0, 1), (-1, -1),
          [colors.whitesmoke, colors.HexColor("#F7FBFF")]),
     ]))
