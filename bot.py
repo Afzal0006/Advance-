@@ -492,7 +492,7 @@ async def topuser(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     users_data[user] += amount
 
     if not users_data:
-        return await update.message.reply_text("📊 No deals found.")
+        return await update.message.reply_text("📊 No Top user found.")
 
     # Sort users by total volume
     sorted_users = sorted(users_data.items(), key=lambda x: x[1], reverse=True)[:20]
