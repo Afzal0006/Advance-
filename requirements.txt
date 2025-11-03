@@ -4,3 +4,4 @@ reportlab
 requests
 pillow>=10.0.0
 dnspython
+pytz
