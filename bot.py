@@ -465,7 +465,7 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # === Footer ===
     date_str = datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%d %b %Y, %H:%M IST")
-    draw.text((150, height - 150), f"📅 Generated on {date_str}", font=font, fill=(100, 100, 100))
+    draw.text((150, height - 150), f"→ Generated on {date_str}", font=font, fill=(100, 100, 100))
 
     # === Save to memory and send ===
     bio = io.BytesIO()
