@@ -882,7 +882,7 @@ async def mystats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elements = []
 
     # === Header ===
-    elements.append(Paragraph("<b>ESCROW TRADE SUMMARY</b>", title_style))
+    elements.append(Paragraph("<b>LUCKY ESCROW SUMMARY</b>", title_style))
     elements.append(Paragraph(f"Generated for {username}", subtitle_style))
     elements.append(Spacer(1, 12))
     elements.append(Paragraph(datetime.now().strftime("📅 %B %d, %Y • %I:%M %p UTC"), subtitle_style))
@@ -920,7 +920,7 @@ async def mystats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # === Footer ===
     elements.append(Paragraph(
-        "💼 Generated securely via <b>Telegram Escrow Bot</b><br/>"
+        "💼 Generated securely via <b>Lucky Escrow Bot</b><br/>"
         "This report summarizes all completed and ongoing trades.",
         footer_style
     ))
