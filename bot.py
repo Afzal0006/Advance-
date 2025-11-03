@@ -810,10 +810,10 @@ from telegram.ext import ContextTypes
 
 def create_sheet_image(rows, page_title="My Deals", columns=None, rows_per_page=12):
     """
-    Creates a table-like image with perfectly thin horizontal & vertical lines.
+    Creates a clean, copyable, table-like image with thin equal lines and readable text.
     """
     if columns is None:
-        columns = ["BUYER", "SELLER", "ESCROWER", "ID", "AMOUNT"]
+        columns = ["BUYER", "SELLER", "ESCROWER", "TRADE ID", "AMOUNT"]
 
     width = 1000
     header_h = 90
@@ -828,7 +828,7 @@ def create_sheet_image(rows, page_title="My Deals", columns=None, rows_per_page=
     # === Fonts ===
     try:
         font_bold = ImageFont.truetype("arialbd.ttf", 28)
-        font_regular = ImageFont.truetype("arial.ttf", 22)
+        font_regular = ImageFont.truetype("arial.ttf", 24)
     except:
         font_bold = ImageFont.load_default()
         font_regular = ImageFont.load_default()
@@ -842,7 +842,7 @@ def create_sheet_image(rows, page_title="My Deals", columns=None, rows_per_page=
     for w in col_widths:
         col_x.append(col_x[-1] + w)
 
-    # === Thin vertical lines (same as horizontal) ===
+    # === Vertical thin lines (same as horizontal) ===
     for x in col_x:
         draw.line([(x + 0.5, header_h - 10), (x + 0.5, height - footer_h)], width=1, fill=(0, 0, 0))
 
@@ -864,6 +864,7 @@ def create_sheet_image(rows, page_title="My Deals", columns=None, rows_per_page=
         y = header_h + i * row_h
         draw.line([(x_start, y + row_h - 10), (width - 20, y + row_h - 10)], width=1, fill=(0, 0, 0))
 
+        # Row text values
         vals = [
             str(row.get("buyer", "")),
             str(row.get("seller", "")),
@@ -872,9 +873,17 @@ def create_sheet_image(rows, page_title="My Deals", columns=None, rows_per_page=
             f"₹{row.get('amount', 0)}",
         ]
 
+        # Proper text alignment inside each cell
         cur_x = x_start
         for j, val in enumerate(vals):
-            draw.text((cur_x + 10, y + 20), val, font=font_regular, fill=(0, 0, 0))
+            try:
+                bbox = draw.textbbox((0, 0), val, font=font_regular)
+                tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+            except AttributeError:
+                tw, th = draw.textsize(val, font=font_regular)
+            tx = cur_x + 10  # left padding
+            ty = y + (row_h - th) / 2  # vertical centering
+            draw.text((tx, ty), val, font=font_regular, fill=(0, 0, 0))
             cur_x += col_widths[j]
 
     return img
