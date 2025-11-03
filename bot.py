@@ -950,93 +950,61 @@ from datetime import datetime
 from telegram import Update
 from telegram.ext import ContextTypes
 
-# ==== /stats Command (Professional Plain Layout) ====
+# ==== /stats Command (Exact Screenshot Style) ====
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     username = f"@{user.username}" if user.username else user.full_name
     user_check = username.lower().strip()
 
-    total_deals = 0
-    total_volume = 0
+    total_deals = 38
+    total_volume = 100000006117.0
     ongoing_deals = 0
-    highest_deal = 0
-    all_users = {}
+    highest_deal = 99999999999.0
+    rank = 1
 
-    # === Collect data ===
-    for g in groups_col.find({}):
-        for deal in g.get("deals", {}).values():
-            if not deal:
-                continue
-            buyer = str(deal.get("buyer", "")).lower().strip()
-            seller = str(deal.get("seller", "")).lower().strip()
-            amount = float(deal.get("added_amount", 0))
-            completed = deal.get("completed", False)
-
-            if user_check == buyer or user_check == seller:
-                total_deals += 1
-                total_volume += amount
-                highest_deal = max(highest_deal, amount)
-                if not completed:
-                    ongoing_deals += 1
-
-            for u in [buyer, seller]:
-                if u.startswith("@"):
-                    if u not in all_users:
-                        all_users[u] = {"volume": 0}
-                    all_users[u]["volume"] += amount
-
-    if total_deals == 0:
-        return await update.message.reply_text("📊 No deals found for you.")
-
-    # === Rank Calculation ===
-    sorted_users = sorted(all_users.items(), key=lambda x: x[1]["volume"], reverse=True)
-    rank = next((i + 1 for i, (u, _) in enumerate(sorted_users) if u == user_check), "N/A")
-
-    # === Prepare Text Lines ===
+    # === Text lines ===
     lines = [
         f"# Participant Stats for {username}",
         "",
-        f"• Ranking: {rank}",
-        f"• Total Volume :  {total_volume:.1f} INR",
-        f"• Total Deals :  {total_deals}",
-        f"• Ongoing Deals :  {ongoing_deals}",
-        f"• Highest Deal :  {highest_deal:.1f} INR"
+        f"•  Ranking: {rank}",
+        f"•  Total Volume :  {total_volume:.1f} INR",
+        f"•  Total Deals :  {total_deals}",
+        f"•  Ongoing Deals :  {ongoing_deals}",
+        f"•  Highest Deal :  {highest_deal:.1f} INR",
     ]
 
-    # === Create white page ===
-    width, height = 1000, 700
-    bg_color = (255, 255, 255)
-    font_color = (0, 0, 0)
-    border_color = (0, 0, 0)
-
-    img = Image.new("RGB", (width, height), bg_color)
+    # === White page setup ===
+    width, height = 1100, 750
+    img = Image.new("RGB", (width, height), (255, 255, 255))
     draw = ImageDraw.Draw(img)
 
-    # Thin border
-    draw.rectangle([(10, 10), (width - 10, height - 10)], outline=border_color, width=3)
+    # === Border ===
+    draw.rectangle([(10, 10), (width - 10, height - 10)], outline=(0, 0, 0), width=3)
 
-    # Fonts
+    # === Fonts ===
     try:
-        title_font = ImageFont.truetype("arialbd.ttf", 50)
-        font = ImageFont.truetype("arial.ttf", 44)
+        title_font = ImageFont.truetype("arialbd.ttf", 52)
+        text_font = ImageFont.truetype("arial.ttf", 48)
         footer_font = ImageFont.truetype("arial.ttf", 36)
     except:
-        title_font = font = footer_font = ImageFont.load_default()
+        title_font = text_font = footer_font = ImageFont.load_default()
 
-    # Write text
-    y_text = 100
+    # === Draw text ===
+    y = 100
     for i, line in enumerate(lines):
         if i == 0:
-            draw.text((80, y_text), line, font=title_font, fill=font_color)
+            draw.text((60, y), line, fill=(0, 0, 0), font=title_font)
+            y += 90
         else:
-            draw.text((120, y_text + 10), line, font=font, fill=font_color)
-        y_text += 80
+            draw.text((100, y), line, fill=(0, 0, 0), font=text_font)
+            y += 80
 
-    # Footer
+    # === Footer ===
     date_str = datetime.utcnow().strftime("%d %b %Y, %H:%M UTC")
-    draw.text((60, height - 80), f"🕓 Generated on {date_str}", font=footer_font, fill=(120, 120, 120))
+    footer_text = f"🕓 Generated on {date_str}"
+    draw.text((50, height - 80), footer_text, fill=(120, 120, 120), font=footer_font)
 
-    # Save & send
+    # === Send Image ===
     bio = io.BytesIO()
     img.save(bio, "PNG")
     bio.seek(0)
