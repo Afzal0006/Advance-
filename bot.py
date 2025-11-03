@@ -944,12 +944,11 @@ async def mystats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         caption=f"📄 Professional deal report for {username}"
     )
 
-from datetime import datetime
-import pytz
+from datetime import datetime, timedelta, timezone
 from telegram import Update
 from telegram.ext import ContextTypes
 
-# ==== /stats Command (IST Timezone Version) ====
+# ==== /stats Command (IST Clean Version) ====
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     username = f"@{user.username}" if user.username else user.full_name
@@ -973,7 +972,7 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
             amount = float(deal.get("added_amount", 0) or 0)
             completed = bool(deal.get("completed", False))
 
-            # === Count for the current user ===
+            # Count stats for this user
             if user_check in [buyer, seller]:
                 total_deals += 1
                 total_volume += amount
@@ -981,7 +980,7 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if not completed:
                     ongoing_deals += 1
 
-            # === Record all users' total volume ===
+            # Add to global stats
             for u in [buyer, seller]:
                 if u.startswith("@") and u != "":
                     all_users.setdefault(u, {"volume": 0})
@@ -995,24 +994,22 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sorted_users = sorted(all_users.items(), key=lambda x: x[1]["volume"], reverse=True)
     rank = next((i + 1 for i, (u, _) in enumerate(sorted_users) if u == user_check), "N/A")
 
-    # === IST Time ===
-    ist = pytz.timezone("Asia/Kolkata")
-    time_now = datetime.now(ist).strftime("%d %b %Y, %I:%M %p")
+    # === IST Time === (no pytz)
+    IST = timezone(timedelta(hours=5, minutes=30))
+    time_now = datetime.now(IST).strftime("%d %b %Y, %I:%M %p")
 
-    # === Formatted Output ===
+    # === Clean Text Output ===
     msg = (
-        f"📊 <b>Participant Stats for {username}</b>\n"
-        f"────────────────────────────\n"
-        f"👑 <b>Ranking:</b> {rank}\n"
-        f"📈 <b>Total Volume:</b> ₹{total_volume:,.1f}\n"
-        f"💼 <b>Total Deals:</b> {total_deals}\n"
-        f"⏳ <b>Ongoing Deals:</b> {ongoing_deals}\n"
-        f"💎 <b>Highest Deal:</b> ₹{highest_deal:,.1f}\n"
-        f"────────────────────────────\n"
-        f"🕓 <i>Updated on {time_now} (IST)</i>"
+        f"📊 Participant Stats for {username}\n\n"
+        f"👑 Ranking: {rank}\n"
+        f"📈 Total Volume: ₹{total_volume:,.1f}\n"
+        f"🧳 Total Deals: {total_deals}\n"
+        f"🧿 Ongoing Deals: {ongoing_deals}\n"
+        f"💳 Highest Deal - ₹{highest_deal:,.1f}\n\n"
+        f"🕓 Updated on {time_now} (IST)"
     )
 
-    await update.message.reply_text(msg, parse_mode="HTML")
+    await update.message.reply_text(msg)
         
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
