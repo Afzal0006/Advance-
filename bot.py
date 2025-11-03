@@ -6,7 +6,7 @@ from pymongo import MongoClient
 
 # ==== CONFIG ====
 BOT_TOKEN = "7643831340:AAGieuPJND4MekAutSf3xzta1qdoKo5mbZU"
-MONGO_URI = "mongodb+srv://TRUSTLYTRANSACTIONBOT:TRUSTLYTRANSACTIONBOT@cluster0.t60mxb7.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+MONGO_URI = "mongodb+srv://Escrow_LuckyWorld:Escrow_LuckyWorld@cluster0.c3jkrlx.mongodb.net/?appName=Cluster0"
 LOG_CHANNEL_ID = -1003067720865
 
 OWNER_IDS = [6998916494]  # Add as many owners as needed
