@@ -946,6 +946,8 @@ async def mystats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 from datetime import datetime
 import pytz
+from telegram import Update
+from telegram.ext import ContextTypes
 
 # ==== /stats Command (IST Timezone Version) ====
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -954,36 +956,40 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_check = username.lower().strip()
 
     total_deals = 0
-    total_volume = 0
+    total_volume = 0.0
     ongoing_deals = 0
-    highest_deal = 0
+    highest_deal = 0.0
     all_users = {}
 
     # === Collect data from all groups ===
     for g in groups_col.find({}):
-        for deal in g.get("deals", {}).values():
+        deals = g.get("deals", {})
+        for deal in deals.values():
             if not deal:
                 continue
+
             buyer = str(deal.get("buyer", "")).lower().strip()
             seller = str(deal.get("seller", "")).lower().strip()
-            amount = float(deal.get("added_amount", 0))
-            completed = deal.get("completed", False)
+            amount = float(deal.get("added_amount", 0) or 0)
+            completed = bool(deal.get("completed", False))
 
-            if user_check == buyer or user_check == seller:
+            # === Count for the current user ===
+            if user_check in [buyer, seller]:
                 total_deals += 1
                 total_volume += amount
                 highest_deal = max(highest_deal, amount)
                 if not completed:
                     ongoing_deals += 1
 
+            # === Record all users' total volume ===
             for u in [buyer, seller]:
-                if u.startswith("@"):
-                    if u not in all_users:
-                        all_users[u] = {"volume": 0}
+                if u.startswith("@") and u != "":
+                    all_users.setdefault(u, {"volume": 0})
                     all_users[u]["volume"] += amount
 
+    # === No deals found ===
     if total_deals == 0:
-        return await update.message.reply_text("📊 No deals found for you.")
+        return await update.message.reply_text("🎉 No stats found for you.")
 
     # === Rank Calculation ===
     sorted_users = sorted(all_users.items(), key=lambda x: x[1]["volume"], reverse=True)
@@ -993,16 +999,16 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ist = pytz.timezone("Asia/Kolkata")
     time_now = datetime.now(ist).strftime("%d %b %Y, %I:%M %p")
 
-    # === Formatted Text Output ===
+    # === Formatted Output ===
     msg = (
         f"📊 <b>Participant Stats for {username}</b>\n"
-        f"───────────────────────\n"
+        f"────────────────────────────\n"
         f"👑 <b>Ranking:</b> {rank}\n"
-        f"📈 <b>Total Volume:</b> ₹{total_volume:.1f}\n"
+        f"📈 <b>Total Volume:</b> ₹{total_volume:,.1f}\n"
         f"💼 <b>Total Deals:</b> {total_deals}\n"
         f"⏳ <b>Ongoing Deals:</b> {ongoing_deals}\n"
-        f"💎 <b>Highest Deal:</b> ₹{highest_deal:.1f}\n"
-        f"───────────────────────\n"
+        f"💎 <b>Highest Deal:</b> ₹{highest_deal:,.1f}\n"
+        f"────────────────────────────\n"
         f"🕓 <i>Updated on {time_now} (IST)</i>"
     )
 
