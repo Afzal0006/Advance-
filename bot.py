@@ -5,11 +5,11 @@ from telegram.ext import Application, CommandHandler, ContextTypes
 from pymongo import MongoClient
 
 # ==== CONFIG ====
-BOT_TOKEN = "7643831340:AAGieuPJND4MekAutSf3xzta1qdoKo5mbZU"
+BOT_TOKEN = "8399143304:AAFf8jNzZgXmo6NeLQUZhQhEfI1tSi_k1mc"
 MONGO_URI = "mongodb+srv://Escrow_LuckyWorld:Escrow_LuckyWorld@cluster0.c3jkrlx.mongodb.net/?appName=Cluster0"
-LOG_CHANNEL_ID = -1003067720865
+LOG_CHANNEL_ID = -1002825024928
 
-OWNER_IDS = [6998916494]  # Add as many owners as needed
+OWNER_IDS = [6847499628]  # Add as many owners as needed
 
 # ==== MONGO CONNECT ====
 client = MongoClient(MONGO_URI)
