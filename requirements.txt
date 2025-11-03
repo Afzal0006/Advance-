@@ -2,4 +2,5 @@ python-telegram-bot==20.3
 pymongo
 reportlab
 requests
-pillow
+pillow>=10.0.0
+dnspython
