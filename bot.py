@@ -944,71 +944,69 @@ async def mystats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         caption=f"📄 Professional deal report for {username}"
     )
 
-from PIL import Image, ImageDraw, ImageFont
-import io
 from datetime import datetime
-from telegram import Update
-from telegram.ext import ContextTypes
+import pytz
 
-# ==== /stats Command (Exact Screenshot Style) ====
+# ==== /stats Command (IST Timezone Version) ====
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     username = f"@{user.username}" if user.username else user.full_name
     user_check = username.lower().strip()
 
-    total_deals = 38
-    total_volume = 100000006117.0
+    total_deals = 0
+    total_volume = 0
     ongoing_deals = 0
-    highest_deal = 99999999999.0
-    rank = 1
+    highest_deal = 0
+    all_users = {}
 
-    # === Text lines ===
-    lines = [
-        f"# Participant Stats for {username}",
-        "",
-        f"•  Ranking: {rank}",
-        f"•  Total Volume :  {total_volume:.1f} INR",
-        f"•  Total Deals :  {total_deals}",
-        f"•  Ongoing Deals :  {ongoing_deals}",
-        f"•  Highest Deal :  {highest_deal:.1f} INR",
-    ]
+    # === Collect data from all groups ===
+    for g in groups_col.find({}):
+        for deal in g.get("deals", {}).values():
+            if not deal:
+                continue
+            buyer = str(deal.get("buyer", "")).lower().strip()
+            seller = str(deal.get("seller", "")).lower().strip()
+            amount = float(deal.get("added_amount", 0))
+            completed = deal.get("completed", False)
 
-    # === White page setup ===
-    width, height = 1100, 750
-    img = Image.new("RGB", (width, height), (255, 255, 255))
-    draw = ImageDraw.Draw(img)
+            if user_check == buyer or user_check == seller:
+                total_deals += 1
+                total_volume += amount
+                highest_deal = max(highest_deal, amount)
+                if not completed:
+                    ongoing_deals += 1
 
-    # === Border ===
-    draw.rectangle([(10, 10), (width - 10, height - 10)], outline=(0, 0, 0), width=3)
+            for u in [buyer, seller]:
+                if u.startswith("@"):
+                    if u not in all_users:
+                        all_users[u] = {"volume": 0}
+                    all_users[u]["volume"] += amount
 
-    # === Fonts ===
-    try:
-        title_font = ImageFont.truetype("arialbd.ttf", 52)
-        text_font = ImageFont.truetype("arial.ttf", 48)
-        footer_font = ImageFont.truetype("arial.ttf", 36)
-    except:
-        title_font = text_font = footer_font = ImageFont.load_default()
+    if total_deals == 0:
+        return await update.message.reply_text("📊 No deals found for you.")
 
-    # === Draw text ===
-    y = 100
-    for i, line in enumerate(lines):
-        if i == 0:
-            draw.text((60, y), line, fill=(0, 0, 0), font=title_font)
-            y += 90
-        else:
-            draw.text((100, y), line, fill=(0, 0, 0), font=text_font)
-            y += 80
+    # === Rank Calculation ===
+    sorted_users = sorted(all_users.items(), key=lambda x: x[1]["volume"], reverse=True)
+    rank = next((i + 1 for i, (u, _) in enumerate(sorted_users) if u == user_check), "N/A")
 
-    # === Footer ===
-    date_str = datetime.utcnow().strftime("%d %b %Y, %H:%M UTC")
-    footer_text = f"🕓 Generated on {date_str}"
-    draw.text((50, height - 80), footer_text, fill=(120, 120, 120), font=footer_font)
+    # === IST Time ===
+    ist = pytz.timezone("Asia/Kolkata")
+    time_now = datetime.now(ist).strftime("%d %b %Y, %I:%M %p")
 
-    # === Send Image ===
-    bio = io.BytesIO()
-    img.save(bio, "PNG")
-    bio.seek(0)
-    await update.message.reply_photo(photo=bio)
+    # === Formatted Text Output ===
+    msg = (
+        f"📊 <b>Participant Stats for {username}</b>\n"
+        f"───────────────────────\n"
+        f"👑 <b>Ranking:</b> {rank}\n"
+        f"📈 <b>Total Volume:</b> ₹{total_volume:.1f}\n"
+        f"💼 <b>Total Deals:</b> {total_deals}\n"
+        f"⏳ <b>Ongoing Deals:</b> {ongoing_deals}\n"
+        f"💎 <b>Highest Deal:</b> ₹{highest_deal:.1f}\n"
+        f"───────────────────────\n"
+        f"🕓 <i>Updated on {time_now} (IST)</i>"
+    )
+
+    await update.message.reply_text(msg, parse_mode="HTML")
         
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
