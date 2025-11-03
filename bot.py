@@ -950,7 +950,7 @@ from datetime import datetime
 from telegram import Update
 from telegram.ext import ContextTypes
 
-# ==== /stats Command ====
+# ==== /stats Command (Professional Plain Layout) ====
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     username = f"@{user.username}" if user.username else user.full_name
@@ -962,7 +962,7 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     highest_deal = 0
     all_users = {}
 
-    # === Collect data from all groups ===
+    # === Collect data ===
     for g in groups_col.find({}):
         for deal in g.get("deals", {}).values():
             if not deal:
@@ -992,54 +992,55 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sorted_users = sorted(all_users.items(), key=lambda x: x[1]["volume"], reverse=True)
     rank = next((i + 1 for i, (u, _) in enumerate(sorted_users) if u == user_check), "N/A")
 
-    # === Text to Display ===
+    # === Prepare Text Lines ===
     lines = [
-        f"📊 Participant Stats for {username}",
+        f"# Participant Stats for {username}",
         "",
-        f"👑 Ranking: {rank}",
-        f"📈 Total Volume: ₹{total_volume:.1f}",
-        f"🧳 Total Deals: {total_deals}",
-        f"🧿 Ongoing Deals: {ongoing_deals}",
-        f"💳 Highest Deal: ₹{highest_deal:.1f}"
+        f"• Ranking: {rank}",
+        f"• Total Volume :  {total_volume:.1f} INR",
+        f"• Total Deals :  {total_deals}",
+        f"• Ongoing Deals :  {ongoing_deals}",
+        f"• Highest Deal :  {highest_deal:.1f} INR"
     ]
 
-    # === Generate clean white-page image ===
-    width, height = 800, 600
+    # === Create white page ===
+    width, height = 1000, 700
     bg_color = (255, 255, 255)
     font_color = (0, 0, 0)
-    border_color = (230, 230, 230)
+    border_color = (0, 0, 0)
 
     img = Image.new("RGB", (width, height), bg_color)
     draw = ImageDraw.Draw(img)
 
-    # Light border
-    draw.rectangle([(20, 20), (width - 20, height - 20)], outline=border_color, width=4)
+    # Thin border
+    draw.rectangle([(10, 10), (width - 10, height - 10)], outline=border_color, width=3)
 
-    # Add text
+    # Fonts
     try:
-        font = ImageFont.truetype("arial.ttf", 48)
-        title_font = ImageFont.truetype("arialbd.ttf", 70)
+        title_font = ImageFont.truetype("arialbd.ttf", 50)
+        font = ImageFont.truetype("arial.ttf", 44)
+        footer_font = ImageFont.truetype("arial.ttf", 36)
     except:
-        font = ImageFont.load_default()
-        title_font = font
+        title_font = font = footer_font = ImageFont.load_default()
 
-    y_text = 80
+    # Write text
+    y_text = 100
     for i, line in enumerate(lines):
         if i == 0:
             draw.text((80, y_text), line, font=title_font, fill=font_color)
         else:
-            draw.text((100, y_text + 10), line, font=font, fill=font_color)
-        y_text += 65
+            draw.text((120, y_text + 10), line, font=font, fill=font_color)
+        y_text += 80
 
-    # Footer with date
+    # Footer
     date_str = datetime.utcnow().strftime("%d %b %Y, %H:%M UTC")
-    draw.text((80, height - 80), f"📅 Generated on {date_str}", font=font, fill=(120, 120, 120))
+    draw.text((60, height - 80), f"🕓 Generated on {date_str}", font=footer_font, fill=(120, 120, 120))
 
-    # === Save and send ===
+    # Save & send
     bio = io.BytesIO()
     img.save(bio, "PNG")
     bio.seek(0)
-    await update.message.reply_photo(photo=bio, caption="📋 Your Escrow Stats Summary")
+    await update.message.reply_photo(photo=bio)
         
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
