@@ -798,100 +798,19 @@ async def week(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(msg, parse_mode="HTML")
 
-import io, requests
-from datetime import datetime
-from PIL import Image, ImageDraw, ImageFont, ImageFilter
-from telegram import Update
-from telegram.ext import ContextTypes
-
-# ==== /ton Command ====
-async def ton(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        # === Fetch from CoinGecko ===
-        url = "https://api.coingecko.com/api/v3/simple/price"
-        params = {
-            "ids": "the-open-network",
-            "vs_currencies": "usd",
-            "include_24hr_change": "true"
-        }
-        res = requests.get(url, params=params)
-        data = res.json()
-
-        ton = data.get("the-open-network", {})
-        price = ton.get("usd", 0.0)
-        daily_change = ton.get("usd_24h_change", 0.0)
-
-        # === Fetch market chart for weekly change ===
-        week_url = "https://api.coingecko.com/api/v3/coins/the-open-network/market_chart"
-        week_res = requests.get(week_url, params={"vs_currency": "usd", "days": "7"})
-        week_data = week_res.json()
-        prices = [p[1] for p in week_data.get("prices", [])]
-        weekly_change = ((prices[-1] - prices[0]) / prices[0]) * 100 if len(prices) > 1 else 0
-
-        # === Image Canvas ===
-        width, height = 1400, 600
-        img = Image.new("RGB", (width, height), (10, 15, 40))
-        draw = ImageDraw.Draw(img)
-
-        # === Gradient background (TON style) ===
-        for y in range(height):
-            blue = int(50 + (y / height) * 120)
-            draw.line([(0, y), (width, y)], fill=(0, blue, 255))
-
-        # === Add soft glow ===
-        glow = img.filter(ImageFilter.GaussianBlur(30))
-        img = Image.blend(img, glow, 0.3)
-        draw = ImageDraw.Draw(img)
-
-        # === Fonts ===
-        try:
-            font_big = ImageFont.truetype("DejaVuSans-Bold.ttf", 140)
-            font_mid = ImageFont.truetype("DejaVuSans-Bold.ttf", 70)
-            font_small = ImageFont.truetype("DejaVuSans.ttf", 45)
-        except:
-            font_big = font_mid = font_small = ImageFont.load_default()
-
-        # === Title ===
-        draw.text((70, 60), "TONCOIN", font=font_mid, fill=(255, 255, 255))
-
-        # === Price ===
-        draw.text((70, 180), f"${price:,.4f}", font=font_big, fill=(91, 173, 255))
-
-        # === Boxes for Daily & Weekly change ===
-        def draw_box(x, y, color, label, value):
-            draw.rounded_rectangle([x, y, x + 400, y + 150], radius=40, fill=color)
-            draw.text((x + 50, y + 30), label, font=font_small, fill=(255, 255, 255))
-            draw.text((x + 50, y + 80), f"{value:+.2f}%", font=font_mid, fill=(255, 255, 255))
-
-        daily_color = (0, 180, 0) if daily_change >= 0 else (220, 0, 0)
-        weekly_color = (0, 180, 0) if weekly_change >= 0 else (220, 0, 0)
-
-        draw_box(100, 400, daily_color, "DAILY CHANGE", daily_change)
-        draw_box(700, 400, weekly_color, "WEEKLY CHANGE", weekly_change)
-
-        # === Save & Send ===
-        bio = io.BytesIO()
-        img.save(bio, "PNG", optimize=True)
-        bio.seek(0)
-
-        await update.message.reply_photo(photo=bio, caption="💎 **Toncoin Price Tracker**", parse_mode="Markdown")
-
-    except Exception as e:
-        await update.message.reply_text(f"⚠️ Error fetching Toncoin data:\n`{e}`", parse_mode="Markdown")
-
 import io
 from PIL import Image, ImageDraw, ImageFont
 from telegram import Update, InputFile
 from telegram.ext import ContextTypes
 
+
 # ==============================
-# === HELPER FUNCTIONS ===
+# === IMAGE + PDF HELPERS ===
 # ==============================
 
 def create_sheet_image(rows, page_title="My Deals", columns=None, rows_per_page=12):
     """
-    Draws image with vertical + horizontal lines like your example.
-    rows = list of dicts with buyer/seller/escrower/trade_id/amount
+    Creates a table-like image with vertical & horizontal lines.
     """
     if columns is None:
         columns = ["BUYER", "SELLER", "ESCROWER", "ID", "AMOUNT"]
@@ -900,7 +819,7 @@ def create_sheet_image(rows, page_title="My Deals", columns=None, rows_per_page=
     header_h = 90
     row_h = 70
     footer_h = 30
-    col_widths = [180, 180, 180, 220, 180]  # per column width
+    col_widths = [180, 180, 180, 220, 180]
     height = header_h + len(rows) * row_h + footer_h + 40
 
     img = Image.new("RGB", (width, height), (255, 255, 255))
@@ -923,7 +842,7 @@ def create_sheet_image(rows, page_title="My Deals", columns=None, rows_per_page=
     for w in col_widths:
         col_x.append(col_x[-1] + w)
 
-    # Draw vertical black lines
+    # Vertical bold lines
     for x in col_x:
         draw.line([(x, header_h - 10), (x, height - footer_h)], width=8, fill=(0, 0, 0))
 
@@ -931,12 +850,17 @@ def create_sheet_image(rows, page_title="My Deals", columns=None, rows_per_page=
     cur_x = x_start
     for i, c in enumerate(columns):
         w = col_widths[i]
-        tw, th = draw.textsize(c, font=font_bold)
+        # Pillow 10+ compatible text size
+        try:
+            bbox = draw.textbbox((0, 0), c, font=font_bold)
+            tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+        except AttributeError:
+            tw, th = draw.textsize(c, font=font_bold)
         tx = cur_x + (w - tw) / 2
         draw.text((tx, header_h - 50), c, font=font_bold, fill=(0, 0, 0))
         cur_x += w
 
-    # === Horizontal lines & row data ===
+    # === Rows + Horizontal Lines ===
     for i, row in enumerate(rows):
         y = header_h + i * row_h
         draw.line([(x_start, y + row_h - 10), (width - 20, y + row_h - 10)], width=2, fill=(0, 0, 0))
@@ -958,7 +882,7 @@ def create_sheet_image(rows, page_title="My Deals", columns=None, rows_per_page=
 
 
 def pil_image_to_pdf_bytes(img):
-    """Convert PIL image → PDF (in memory)."""
+    """Convert PIL image to in-memory PDF bytes."""
     bio = io.BytesIO()
     if img.mode in ("RGBA", "LA"):
         bg = Image.new("RGB", img.size, (255, 255, 255))
@@ -977,8 +901,7 @@ async def mystats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     username = f"@{user.username}" if user.username else user.full_name
 
-    # === Collect user deals from your Mongo ===
-    # (you already have groups_col, so just paste this part)
+    # === Collect deals (use your Mongo groups_col) ===
     all_deals = []
     for g in groups_col.find({}):
         for d in g.get("deals", {}).values():
@@ -994,7 +917,7 @@ async def mystats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not all_deals:
         return await update.message.reply_text("🎉 No deals found for you!")
 
-    # === Create image like your example ===
+    # === Create image ===
     img = create_sheet_image(all_deals, page_title=f"{username}'s Deals")
 
     # === Convert to PDF ===
@@ -1004,7 +927,7 @@ async def mystats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.effective_chat.send_document(
         document=InputFile(pdf_bytes, filename=file_name),
         caption=f"📄 Your deals summary, {username}"
-        )
+    )
         
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
