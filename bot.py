@@ -943,6 +943,103 @@ async def mystats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         document=InputFile(buffer, filename=f"{username.strip('@')}_deals.pdf"),
         caption=f"📄 Professional deal report for {username}"
     )
+
+from PIL import Image, ImageDraw, ImageFont
+import io
+from datetime import datetime
+from telegram import Update
+from telegram.ext import ContextTypes
+
+# ==== /stats Command ====
+async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    username = f"@{user.username}" if user.username else user.full_name
+    user_check = username.lower().strip()
+
+    total_deals = 0
+    total_volume = 0
+    ongoing_deals = 0
+    highest_deal = 0
+    all_users = {}
+
+    # === Collect data from all groups ===
+    for g in groups_col.find({}):
+        for deal in g.get("deals", {}).values():
+            if not deal:
+                continue
+            buyer = str(deal.get("buyer", "")).lower().strip()
+            seller = str(deal.get("seller", "")).lower().strip()
+            amount = float(deal.get("added_amount", 0))
+            completed = deal.get("completed", False)
+
+            if user_check == buyer or user_check == seller:
+                total_deals += 1
+                total_volume += amount
+                highest_deal = max(highest_deal, amount)
+                if not completed:
+                    ongoing_deals += 1
+
+            for u in [buyer, seller]:
+                if u.startswith("@"):
+                    if u not in all_users:
+                        all_users[u] = {"volume": 0}
+                    all_users[u]["volume"] += amount
+
+    if total_deals == 0:
+        return await update.message.reply_text("📊 No deals found for you.")
+
+    # === Rank Calculation ===
+    sorted_users = sorted(all_users.items(), key=lambda x: x[1]["volume"], reverse=True)
+    rank = next((i + 1 for i, (u, _) in enumerate(sorted_users) if u == user_check), "N/A")
+
+    # === Text to Display ===
+    lines = [
+        f"📊 Participant Stats for {username}",
+        "",
+        f"👑 Ranking: {rank}",
+        f"📈 Total Volume: ₹{total_volume:.1f}",
+        f"🧳 Total Deals: {total_deals}",
+        f"🧿 Ongoing Deals: {ongoing_deals}",
+        f"💳 Highest Deal: ₹{highest_deal:.1f}"
+    ]
+
+    # === Generate clean white-page image ===
+    width, height = 800, 600
+    bg_color = (255, 255, 255)
+    font_color = (0, 0, 0)
+    border_color = (230, 230, 230)
+
+    img = Image.new("RGB", (width, height), bg_color)
+    draw = ImageDraw.Draw(img)
+
+    # Light border
+    draw.rectangle([(20, 20), (width - 20, height - 20)], outline=border_color, width=4)
+
+    # Add text
+    try:
+        font = ImageFont.truetype("arial.ttf", 48)
+        title_font = ImageFont.truetype("arialbd.ttf", 70)
+    except:
+        font = ImageFont.load_default()
+        title_font = font
+
+    y_text = 80
+    for i, line in enumerate(lines):
+        if i == 0:
+            draw.text((80, y_text), line, font=title_font, fill=font_color)
+        else:
+            draw.text((100, y_text + 10), line, font=font, fill=font_color)
+        y_text += 65
+
+    # Footer with date
+    date_str = datetime.utcnow().strftime("%d %b %Y, %H:%M UTC")
+    draw.text((80, height - 80), f"📅 Generated on {date_str}", font=font, fill=(120, 120, 120))
+
+    # === Save and send ===
+    bio = io.BytesIO()
+    img.save(bio, "PNG")
+    bio.seek(0)
+    await update.message.reply_photo(photo=bio, caption="📋 Your Escrow Stats Summary")
         
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
