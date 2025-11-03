@@ -810,7 +810,7 @@ from telegram.ext import ContextTypes
 
 def create_sheet_image(rows, page_title="My Deals", columns=None, rows_per_page=12):
     """
-    Creates a table-like image with vertical & horizontal lines.
+    Creates a table-like image with perfectly thin horizontal & vertical lines.
     """
     if columns is None:
         columns = ["BUYER", "SELLER", "ESCROWER", "ID", "AMOUNT"]
@@ -842,15 +842,14 @@ def create_sheet_image(rows, page_title="My Deals", columns=None, rows_per_page=
     for w in col_widths:
         col_x.append(col_x[-1] + w)
 
-    # Vertical bold lines
+    # === Thin vertical lines (same as horizontal) ===
     for x in col_x:
-        draw.line([(x, header_h - 10), (x, height - footer_h)], width=8, fill=(0, 0, 0))
+        draw.line([(x + 0.5, header_h - 10), (x + 0.5, height - footer_h)], width=1, fill=(0, 0, 0))
 
     # === Column Headers ===
     cur_x = x_start
     for i, c in enumerate(columns):
         w = col_widths[i]
-        # Pillow 10+ compatible text size
         try:
             bbox = draw.textbbox((0, 0), c, font=font_bold)
             tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
@@ -860,10 +859,10 @@ def create_sheet_image(rows, page_title="My Deals", columns=None, rows_per_page=
         draw.text((tx, header_h - 50), c, font=font_bold, fill=(0, 0, 0))
         cur_x += w
 
-    # === Rows + Horizontal Lines ===
+    # === Rows + Thin horizontal lines ===
     for i, row in enumerate(rows):
         y = header_h + i * row_h
-        draw.line([(x_start, y + row_h - 10), (width - 20, y + row_h - 10)], width=2, fill=(0, 0, 0))
+        draw.line([(x_start, y + row_h - 10), (width - 20, y + row_h - 10)], width=1, fill=(0, 0, 0))
 
         vals = [
             str(row.get("buyer", "")),
