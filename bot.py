@@ -811,7 +811,7 @@ from telegram.ext import ContextTypes
 from datetime import datetime
 
 
-async def mystats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def history(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     username = f"@{user.username}" if user.username else user.full_name
 
@@ -830,7 +830,7 @@ async def mystats(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 ])
 
     if not all_deals:
-        return await update.message.reply_text("🎉 No deals found for you!")
+        return await update.message.reply_text(" No deals found for you!")
 
     # === Sort by time or trade_id (old → new) ===
     all_deals.sort(key=lambda x: x[-1])  # sort by time_added (last element)
@@ -1019,7 +1019,7 @@ def main():
     app.add_handler(CommandHandler("mydeals", mydeals))
     app.add_handler(CommandHandler("daily", daily))
     app.add_handler(CommandHandler("week", week))
-    app.add_handler(CommandHandler("mystats", mystats))
+    app.add_handler(CommandHandler("history", history))
 
     print("Bot started... ✅")
     app.run_polling()
