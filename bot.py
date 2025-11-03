@@ -65,18 +65,19 @@ def extract_username_from_user(user):
 # ==== COMMANDS ====
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = (
-        "✨ <b>Welcome to Escrower Bot!</b> ✨\n\n"
+        "✨ <b>Welcome to @Escrow_LuckyWorld !</b> ✨\n\n"
         "• /add <code>amount</code> – Add a new deal\n"
         "• /complete <code>amount</code> – Complete a deal (reply-based)\n"
         "• /update <code>trade_id</code> – Complete deal by Trade ID (0% fee)\n"
         "• /status <code>trade_id</code> – Check deal status by Trade ID\n"
         "• /stats – Your personal stats\n"
         "• /gstats – Global stats (Admin only)\n"
-        "• /allstats – All users stats (Admin only)\n"
-        "• /pending – View pending deals\n"
+        "• /topuser – top 20 user list (Admin only)\n"
+        "• /ongoing – View ongoing deals\n"
         "• /addadmin <code>user_id</code> – Owner only\n"
         "• /removeadmin <code>user_id</code> – Owner only\n"
         "• /adminlist – Show all admins"
+        "• there are many command not mentioned above\n"
     )
     await update.message.reply_text(msg, parse_mode="HTML")
 
