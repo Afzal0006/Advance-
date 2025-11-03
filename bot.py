@@ -947,7 +947,6 @@ def main():
     app.add_handler(CommandHandler("mydeals", mydeals))
     app.add_handler(CommandHandler("daily", daily))
     app.add_handler(CommandHandler("week", week))
-    app.add_handler(CommandHandler("ton", ton))
     app.add_handler(CommandHandler("mystats", mystats))
 
     print("Bot started... ✅")
