@@ -5,11 +5,11 @@ from telegram.ext import Application, CommandHandler, ContextTypes
 from pymongo import MongoClient
 
 # ==== CONFIG ====
-BOT_TOKEN = "8411607342:AAHSDSB98MDYeuYMZUk6nHqKtZy2zquhVig"
-MONGO_URI = "mongodb+srv://Newdemodetabade:Newdemodetabade@cluster0.vp23uhz.mongodb.net/?appName=Cluster0"
+BOT_TOKEN = "8399143304:AAFf8jNzZgXmo6NeLQUZhQhEfI1tSi_k1mc"
+MONGO_URI = "mongodb+srv://Escrow_LuckyWorld:Escrow_LuckyWorld@cluster0.c3jkrlx.mongodb.net/?appName=Cluster0"
 LOG_CHANNEL_ID = -1002821784807
 
-OWNER_IDS = [6998916494]  # Add as many owners as needed
+OWNER_IDS = [6998916494, 7070438535]  # Add as many owners as needed
 
 # ==== MONGO CONNECT ====
 client = MongoClient(MONGO_URI)
@@ -156,8 +156,8 @@ async def add_deal(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     keyboard = [
         [
-            InlineKeyboardButton("3% Fee", callback_data=f"fee3_{trade_id}"),
-            InlineKeyboardButton("5% Fee", callback_data=f"fee5_{trade_id}")
+            InlineKeyboardButton("0% Fee", callback_data=f"fee0_{trade_id}"),
+            InlineKeyboardButton("3% Fee", callback_data=f"fee3_{trade_id}")
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -194,10 +194,10 @@ async def fee_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     seller = deal["seller"]
     escrower = deal["escrower"]
 
-    if fee_type == "fee3":
-        fee = amount * 0.03
+    if fee_type == "fee0":
+        fee = amount * 0.00
     else:
-        fee = amount * 0.05
+        fee = amount * 0.03
 
     release_amount = amount - fee
 
