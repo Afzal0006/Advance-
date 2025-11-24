@@ -156,8 +156,8 @@ async def add_deal(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     keyboard = [
         [
-            InlineKeyboardButton("0% Fee", callback_data=f"fee0_{trade_id}"),
-            InlineKeyboardButton("3% Fee", callback_data=f"fee3_{trade_id}")
+            InlineKeyboardButton("3% Fee", callback_data=f"fee3_{trade_id}"),
+            InlineKeyboardButton("5% Fee", callback_data=f"fee5_{trade_id}")
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -169,8 +169,21 @@ async def add_deal(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="HTML"
     )
 
+
+# ==== FEE BUTTON HANDLER (Admin Only) ====
 async def fee_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
+
+    # ------------------ ADMIN CHECK ------------------
+    user_id = query.from_user.id
+    chat_id = query.message.chat_id
+    admins = await context.bot.get_chat_administrators(chat_id)
+    admin_ids = [a.user.id for a in admins]
+
+    if user_id not in admin_ids:
+        return await query.answer("❌ Not for you! Admins only.", show_alert=True)
+    # --------------------------------------------------
+
     await query.answer()
 
     data = query.data.split("_")
@@ -194,10 +207,10 @@ async def fee_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     seller = deal["seller"]
     escrower = deal["escrower"]
 
-    if fee_type == "fee0":
-        fee = amount * 0.00
-    else:
+    if fee_type == "fee3":
         fee = amount * 0.03
+    else:
+        fee = amount * 0.05
 
     release_amount = amount - fee
 
